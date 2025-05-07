@@ -1,6 +1,8 @@
 package com.bookmarkservice.user.controller;
 
-import com.bookmarkservice.user.dto.SignupRequestDto;
+import com.bookmarkservice.user.dto.LoginRequestDto;
+import com.bookmarkservice.user.dto.LoginResponseDto;
+import com.bookmarkservice.user.dto.RegisterDto;
 import com.bookmarkservice.user.repository.UserRepository;
 import com.bookmarkservice.user.service.UserService;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +21,7 @@ public class UserController {
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<String> signup(@RequestBody SignupRequestDto dto) {
+    public ResponseEntity<String> signup(@RequestBody RegisterDto dto) {
         if (userRepository.existsByEmail(dto.getEmail())) {
             return ResponseEntity.badRequest().body("이미 가입된 이메일입니다.");
         }
@@ -31,4 +33,15 @@ public class UserController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequestDto request) {
+        try {
+            LoginResponseDto response = userService.login(request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
 }
