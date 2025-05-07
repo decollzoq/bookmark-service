@@ -1,4 +1,4 @@
-package com.bookmarkservice.service;
+package com.bookmarkservice.common.email;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;

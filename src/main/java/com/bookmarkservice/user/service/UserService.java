@@ -1,8 +1,9 @@
-package com.bookmarkservice.service;
+package com.bookmarkservice.user.service;
 
-import com.bookmarkservice.dto.SignupRequestDto;
-import com.bookmarkservice.entity.User;
-import com.bookmarkservice.repository.UserRepository;
+import com.bookmarkservice.user.dto.SignupRequestDto;
+import com.bookmarkservice.user.entity.User;
+import com.bookmarkservice.email.service.EmailVerificationService;
+import com.bookmarkservice.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,4 +28,16 @@ public class UserService {
 
         userRepository.save(user);
     }
+
+    public String login(SignupRequestDto.LoginRequestDto request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 이메일입니다."));
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+        }
+
+        return jwtUtil.generateToken(user.getEmail());
+    }
+
 }

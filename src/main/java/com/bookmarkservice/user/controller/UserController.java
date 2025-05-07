@@ -1,8 +1,8 @@
-package com.bookmarkservice.controller;
+package com.bookmarkservice.user.controller;
 
-import com.bookmarkservice.dto.SignupRequestDto;
-import com.bookmarkservice.repository.UserRepository;
-import com.bookmarkservice.service.UserService;
+import com.bookmarkservice.user.dto.SignupRequestDto;
+import com.bookmarkservice.user.repository.UserRepository;
+import com.bookmarkservice.user.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

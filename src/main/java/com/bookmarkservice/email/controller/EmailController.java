@@ -1,6 +1,6 @@
-package com.bookmarkservice.controller;
+package com.bookmarkservice.email.controller;
 
-import com.bookmarkservice.service.EmailVerificationService;
+import com.bookmarkservice.email.service.EmailVerificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

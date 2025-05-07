@@ -1,4 +1,4 @@
-package com.bookmarkservice.dto;
+package com.bookmarkservice.user.dto;
 
 import lombok.*;
 
@@ -11,4 +11,10 @@ public class SignupRequestDto {
     private String email;
     private String password;
     private String nickname;
+
+    @Getter
+    public static class LoginRequestDto {
+        private String email;
+        private String password;
+    }
 }

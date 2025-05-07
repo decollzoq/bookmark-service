@@ -1,10 +1,11 @@
-package com.bookmarkservice.repository;
+package com.bookmarkservice.user.repository;
 
-import com.bookmarkservice.entity.User;
+import com.bookmarkservice.user.entity.User;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public interface UserRepository extends MongoRepository<User, String> {
     boolean existsByEmail(String email);
+
 }

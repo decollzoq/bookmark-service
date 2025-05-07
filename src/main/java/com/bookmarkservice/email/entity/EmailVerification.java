@@ -1,4 +1,4 @@
-package com.bookmarkservice.entity;
+package com.bookmarkservice.email.entity;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
