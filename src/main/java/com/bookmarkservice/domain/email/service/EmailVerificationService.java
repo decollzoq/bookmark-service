@@ -36,7 +36,7 @@ public class EmailVerificationService {
                     if (!v.getCode().equals(code)) return VerificationResult.CODE_MISMATCH;
                     if (v.getExpiresAt().isBefore(LocalDateTime.now())) return VerificationResult.CODE_EXPIRED;
 
-                    v.setVerified(true);                // ✅ 인증 성공 시 인증 처리
+                    v.setVerified(true);
                     repository.save(v);
                     return VerificationResult.SUCCESS;
                 })
