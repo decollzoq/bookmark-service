@@ -26,7 +26,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = jwtTokenProvider.resolveToken(request);
 
-        if (StringUtils.hasText(token) && jwtTokenProvider.isValid(token)) {
+        if (StringUtils.hasText(token)) {
+            // 토큰 유효성 검사
+            jwtTokenProvider.validateTokenOrThrow(token);
+
             String userId = jwtTokenProvider.getUserIdFromToken(token);
 
             // 인증 객체 생성

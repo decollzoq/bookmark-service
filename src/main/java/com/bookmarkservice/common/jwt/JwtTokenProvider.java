@@ -1,5 +1,6 @@
 package com.bookmarkservice.common.jwt;
 
+import com.bookmarkservice.common.exception.UnauthorizedException;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
@@ -64,14 +65,16 @@ public class JwtTokenProvider {
     }
 
     // 토큰 유효성 검사
-    public boolean isValid(String token) {
+    public void validateTokenOrThrow(String token) {
         try {
             Jwts.parserBuilder().setSigningKey(secretKey).build().parseClaimsJws(token);
-            return true;
+        } catch (ExpiredJwtException e) {
+            throw new UnauthorizedException("토큰이 만료되었습니다.");
         } catch (JwtException | IllegalArgumentException e) {
-            return false;
+            throw new UnauthorizedException("유효하지 않은 토큰입니다.");
         }
     }
+
 
     // Authorization 헤더에서 토큰 추출
     public String resolveToken(HttpServletRequest request) {
