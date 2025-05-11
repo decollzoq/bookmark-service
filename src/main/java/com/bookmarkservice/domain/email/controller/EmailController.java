@@ -1,6 +1,6 @@
-package com.bookmarkservice.email.controller;
+package com.bookmarkservice.domain.email.controller;
 
-import com.bookmarkservice.email.service.EmailVerificationService;
+import com.bookmarkservice.domain.email.service.EmailVerificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,7 +12,7 @@ public class EmailController {
 
     private final EmailVerificationService emailVerificationService;
 
-    @PostMapping("/auth/send-code")
+    @PostMapping("/send-code")
     public ResponseEntity<?> sendCode(@RequestParam String email) {
         emailVerificationService.sendVerificationCode(email);
         return ResponseEntity.ok("인증 코드가 이메일로 전송되었습니다.");

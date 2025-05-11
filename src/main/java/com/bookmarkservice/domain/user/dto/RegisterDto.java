@@ -1,4 +1,4 @@
-package com.bookmarkservice.user.dto;
+package com.bookmarkservice.domain.user.dto;
 
 import lombok.*;
 

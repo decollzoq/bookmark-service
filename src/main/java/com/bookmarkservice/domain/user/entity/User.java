@@ -1,4 +1,4 @@
-package com.bookmarkservice.user.entity;
+package com.bookmarkservice.domain.user.entity;
 
 import lombok.*;
 import org.springframework.data.annotation.Id;

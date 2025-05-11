@@ -1,4 +1,4 @@
-package com.bookmarkservice.user.dto;
+package com.bookmarkservice.domain.auth.dto;
 
 import lombok.Getter;
 

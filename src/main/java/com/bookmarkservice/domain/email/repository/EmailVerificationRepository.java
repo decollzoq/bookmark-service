@@ -1,6 +1,6 @@
-package com.bookmarkservice.email.repository;
+package com.bookmarkservice.domain.email.repository;
 
-import com.bookmarkservice.email.entity.EmailVerification;
+import com.bookmarkservice.domain.email.entity.EmailVerification;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import java.util.Optional;
 

@@ -1,8 +1,8 @@
-package com.bookmarkservice.email.service;
+package com.bookmarkservice.domain.email.service;
 
 import com.bookmarkservice.common.email.MailService;
-import com.bookmarkservice.email.entity.EmailVerification;
-import com.bookmarkservice.email.repository.EmailVerificationRepository;
+import com.bookmarkservice.domain.email.entity.EmailVerification;
+import com.bookmarkservice.domain.email.repository.EmailVerificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
