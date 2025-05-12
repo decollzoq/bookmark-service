@@ -1,11 +1,9 @@
 package com.bookmarkservice.domain.bookmark.controller;
 
-import com.bookmarkservice.common.jwt.JwtTokenProvider;
 import com.bookmarkservice.domain.bookmark.dto.BookmarkRequestDto;
 import com.bookmarkservice.domain.bookmark.dto.BookmarkResponseDto;
 import com.bookmarkservice.domain.bookmark.dto.BookmarkUpdateRequestDto;
 import com.bookmarkservice.domain.bookmark.service.BookmarkService;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,12 +17,9 @@ import java.util.List;
 public class BookmarkController {
 
     private final BookmarkService bookmarkService;
-    private final JwtTokenProvider jwtTokenProvider;
 
     @PostMapping
-    public ResponseEntity<BookmarkResponseDto> createBookmark(@RequestBody BookmarkRequestDto request, HttpServletRequest httpServletRequest) {
-        String token = jwtTokenProvider.resolveToken(httpServletRequest);
-        String userId = jwtTokenProvider.getUserIdFromToken(token);
+    public ResponseEntity<BookmarkResponseDto> createBookmark(@RequestBody BookmarkRequestDto request, @AuthenticationPrincipal String userId) {
 
         BookmarkResponseDto response = bookmarkService.createBookmark(userId, request);
         return ResponseEntity.ok(response);
@@ -65,6 +60,4 @@ public class BookmarkController {
         bookmarkService.deleteBookmark(userId, bookmarkId);
         return ResponseEntity.noContent().build();
     }
-
-
 }
