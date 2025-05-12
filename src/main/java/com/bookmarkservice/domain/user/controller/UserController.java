@@ -1,7 +1,5 @@
 package com.bookmarkservice.domain.user.controller;
 
-import com.bookmarkservice.domain.auth.dto.LoginRequestDto;
-import com.bookmarkservice.domain.auth.dto.LoginResponseDto;
 import com.bookmarkservice.domain.user.dto.RegisterDto;
 import com.bookmarkservice.domain.user.repository.UserRepository;
 import com.bookmarkservice.domain.user.service.UserService;

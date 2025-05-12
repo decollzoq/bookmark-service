@@ -26,7 +26,11 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/test", "/users/**", "/email/**","/auth/**").permitAll() // 로그인, 회원가입, 이메일 인증은 허용
+                        .requestMatchers(
+                                "/test",
+                                "/users/**",
+                                "/email/**",
+                                "/auth/**").permitAll() // 로그인, 회원가입, 이메일 인증은 허용
                         .anyRequest().authenticated() // 나머지 요청은 인증 필요
                 )
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class)
