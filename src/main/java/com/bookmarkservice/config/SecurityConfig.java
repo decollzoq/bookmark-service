@@ -30,7 +30,9 @@ public class SecurityConfig {
                                 "/test",
                                 "/users/**",
                                 "/email/**",
-                                "/auth/**").permitAll() // 로그인, 회원가입, 이메일 인증은 허용
+                                "/auth/**",
+                                "/api/categories/share/**"
+                                ).permitAll() // 로그인, 회원가입, 이메일 인증은 허용
                         .anyRequest().authenticated() // 나머지 요청은 인증 필요
                 )
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class)
