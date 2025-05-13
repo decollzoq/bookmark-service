@@ -18,4 +18,5 @@ spring:
           starttls:
             enable: true
 
-spring.config.import: optional:application-secret.yml
+  config:
+    import: optional:application-secret.yml
