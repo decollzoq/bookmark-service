@@ -1,0 +1,43 @@
+# Build artifacts
+/build/
+.gradle/
+*.class
+*.jar
+*.war
+
+# Gradle wrapper
+!gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# STS
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# VS Code
+.vscode/
+
+# Secret files
+application-secret.yml
+
+# Others
+.DS_Store
+HELP.md
