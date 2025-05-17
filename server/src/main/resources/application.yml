@@ -1,7 +1,9 @@
 spring:
   data:
     mongodb:
+<<<<<<< HEAD
       database: bookmarkservice
+=======
   jackson:
     serialization:
       fail-on-empty-beans: false

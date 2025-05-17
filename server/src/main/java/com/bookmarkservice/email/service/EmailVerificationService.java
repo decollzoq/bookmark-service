@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class EmailVerificationService {
 
-    private final EmailVerificationRepository repository;
+    private final EmailVerificationRepository emailVerificationRepository;
     private final MailService mailService;
 
     public enum VerificationResult {
@@ -21,23 +21,25 @@ public class EmailVerificationService {
 
     // 인증 코드 전송 로직
     public void sendVerificationCode(String email) {
+        emailVerificationRepository.deleteByEmail(email);
+
         String code = generateRandomCode(); // 코드 생성
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(5);   // 유효시간 5분 설정
 
         mailService.sendMail(email, "[북마크 서비스] 이메일 인증코드", "인증코드: " + code); // 메일 전송
 
         EmailVerification verification = new EmailVerification(null, email, code, expiresAt, false);
-        repository.save(verification);
+        emailVerificationRepository.save(verification);
     }
 
     public VerificationResult verifyCodeWithResult(String email, String code) {
-        return repository.findByEmail(email)
+        return emailVerificationRepository.findByEmail(email)
                 .map(v -> {
                     if (!v.getCode().equals(code)) return VerificationResult.CODE_MISMATCH;
                     if (v.getExpiresAt().isBefore(LocalDateTime.now())) return VerificationResult.CODE_EXPIRED;
 
                     v.setVerified(true);
-                    repository.save(v);
+                    emailVerificationRepository.save(v);
                     return VerificationResult.SUCCESS;
                 })
                 .orElse(VerificationResult.CODE_MISMATCH);
@@ -48,7 +50,7 @@ public class EmailVerificationService {
     }
 
     public boolean canRegister(String email) {
-        return repository.findByEmail(email)
+        return emailVerificationRepository.findByEmail(email)
                 .map(EmailVerification::isVerified)
                 .orElse(false);
     }
