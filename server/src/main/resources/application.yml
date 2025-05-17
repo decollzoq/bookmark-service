@@ -1,22 +1,20 @@
 spring:
   data:
     mongodb:
-      uri: mongodb://localhost:27017/bookmarkservice
-      auto-index-creation: true
+      database: bookmarkservice
   jackson:
     serialization:
       fail-on-empty-beans: false
-  mail:
-    host: smtp.gmail.com
-    port: 587
-    username: bookmark.service.noreply@gmail.com
-    password:
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-
   config:
     import: optional:application-secret.yml
+
+server:
+  port: 8080
+
+logging:
+  level:
+    org.springframework.data.mongodb: DEBUG
+    org.mongodb: DEBUG
+    org.springframework.mail: DEBUG
+    com.bookmarkservice.common.email: DEBUG
+    root: INFO
