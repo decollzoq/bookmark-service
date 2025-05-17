@@ -19,6 +19,6 @@ public class Category {
     private String userId;
     private String title;
     private List<String> tagIds;
-    private boolean isPublic;
+    private Boolean isPublic;
     private LocalDateTime createdAt;
 }
