@@ -1,7 +1,7 @@
 spring:
   data:
     mongodb:
-      uri: mongodb://localhost:27017/bookmarkservice
+      uri: ${MONGODB_URI}
       auto-index-creation: true
   jackson:
     serialization:
