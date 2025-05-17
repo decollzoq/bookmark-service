@@ -37,7 +37,7 @@ public class CategoryService {
                 .userId(userId)
                 .title(dto.getTitle())
                 .tagIds(tagIds)
-                .isPublic(dto.getIsPublic())
+                .isPublic(dto.isPublic())
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -64,7 +64,7 @@ public class CategoryService {
 
         category.setTitle(dto.getTitle());
         category.setTagIds(tagIds);
-        category.setIsPublic(dto.getIsPublic());
+        category.setPublic(dto.isPublic());
 
         categoryRepository.save(category);
 
@@ -76,7 +76,7 @@ public class CategoryService {
                 .filter(c -> c.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("카테고리를 찾을 수 없습니다."));
 
-        category.setIsPublic(!category.getIsPublic());
+        category.setPublic(!category.isPublic());
         categoryRepository.save(category);
     }
 
