@@ -7,5 +7,6 @@ import java.util.List;
 public class CategoryRequestDto {
     private String title;
     private List<String> tagNames;
-    private boolean isPublic;
+    private Boolean isPublic;
+
 }
