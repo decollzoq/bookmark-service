@@ -14,7 +14,7 @@ interface LoginResponse {
 interface RegisterRequest {
   email: string;
   password: string;
-  name: string;
+  nickname: string;
 }
 
 // 인증 관련 서비스

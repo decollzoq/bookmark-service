@@ -1341,7 +1341,7 @@ export const useBookmarkStore = create<BookmarkState>()(
           const registerResponse = await apiClient.post('/users/register', {
             email,
             password,
-            name: username
+            nickname: username
           });
           
           console.log('회원가입 완료. 자동 로그인 시도:', email);
