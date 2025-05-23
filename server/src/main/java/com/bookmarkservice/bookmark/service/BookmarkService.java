@@ -8,6 +8,7 @@ import com.bookmarkservice.bookmark.repository.BookmarkRepository;
 import com.bookmarkservice.category.entity.Category;
 import com.bookmarkservice.category.repository.CategoryRepository;
 import com.bookmarkservice.common.exception.NotFoundException;
+import com.bookmarkservice.tag.dto.ResolvedTagsDto;
 import com.bookmarkservice.tag.service.TagService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,21 +26,20 @@ public class BookmarkService {
     private final TagService tagService;
 
     public BookmarkResponseDto createBookmark(String userId, BookmarkRequestDto dto) {
-        List<String> tagIds = tagService.resolveTagIdsFromNames(dto.getTagNames(), userId);
-
+        ResolvedTagsDto resolvedTags = tagService.resolveTagsFromNames(dto.getTagNames(), userId);
         Bookmark bookmark = Bookmark.builder()
                 .userId(userId)
                 .url(dto.getUrl())
                 .title(dto.getTitle())
                 .description(dto.getDescription())
                 .favorite(dto.isFavorite())
-                .tagIds(tagIds)
+                .tagIds(resolvedTags.getTagIds())
                 .createdAt(LocalDateTime.now())
                 .build();
 
         bookmarkRepository.save(bookmark);
 
-        return new BookmarkResponseDto(bookmark, tagService.findTagsByIds(tagIds));
+        return new BookmarkResponseDto(bookmark, resolvedTags.getTags());
     }
 
     public List<BookmarkResponseDto> getAllBookmarks(String userId) {
@@ -101,12 +101,12 @@ public class BookmarkService {
         bookmark.setDescription(dto.getDescription());
         bookmark.setFavorite(dto.isFavorite());
 
-        List<String> tagIds = tagService.resolveTagIdsFromNames(dto.getTagNames(), userId);
-        bookmark.setTagIds(tagIds);
+        ResolvedTagsDto tags = tagService.resolveTagsFromNames(dto.getTagNames(), userId);
+        bookmark.setTagIds(tags.getTagIds());
 
         bookmarkRepository.save(bookmark);
 
-        return new BookmarkResponseDto(bookmark, tagService.findTagsByIds(tagIds));
+        return new BookmarkResponseDto(bookmark, tags.getTags());
     }
 
     public void toggleFavorite(String userId, String bookmarkId) {

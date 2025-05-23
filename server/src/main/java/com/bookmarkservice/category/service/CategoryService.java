@@ -12,6 +12,7 @@ import com.bookmarkservice.category.repository.CategoryRepository;
 import com.bookmarkservice.common.exception.NotFoundException;
 import com.bookmarkservice.share.repository.ShareTokenRepository;
 import com.bookmarkservice.share.service.ShareTokenService;
+import com.bookmarkservice.tag.dto.ResolvedTagsDto;
 import com.bookmarkservice.tag.dto.TagResponseDto;
 import com.bookmarkservice.tag.service.TagService;
 import lombok.RequiredArgsConstructor;
@@ -31,17 +32,17 @@ public class CategoryService {
     private final ShareTokenRepository shareTokenRepository;
 
     public CategoryResponseDto createCategory(String userId, CategoryRequestDto dto) {
-        List<String> tagIds = tagService.resolveTagIdsFromNames(dto.getTagNames(), userId);
+        ResolvedTagsDto tags = tagService.resolveTagsFromNames(dto.getTagNames(), userId);
 
         Category category = Category.builder()
                 .userId(userId)
                 .title(dto.getTitle())
-                .tagIds(tagIds)
+                .tagIds(tags.getTagIds())
                 .isPublic(dto.getIsPublic())
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        return new CategoryResponseDto(categoryRepository.save(category), tagService.findTagsByIds(tagIds));
+        return new CategoryResponseDto(categoryRepository.save(category), tags.getTags());
     }
 
     public List<CategoryResponseDto> getMyCategories(String userId) {
@@ -60,15 +61,15 @@ public class CategoryService {
                 .filter(c -> c.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("카테고리를 찾을 수 없습니다."));
 
-        List<String> tagIds = tagService.resolveTagIdsFromNames(dto.getTagNames(), userId);
+        ResolvedTagsDto tags = tagService.resolveTagsFromNames(dto.getTagNames(), userId);
 
         category.setTitle(dto.getTitle());
-        category.setTagIds(tagIds);
+        category.setTagIds(tags.getTagIds());
         category.setIsPublic(dto.getIsPublic());
 
         categoryRepository.save(category);
 
-        return new CategoryResponseDto(category, tagService.findTagsByIds(tagIds));
+        return new CategoryResponseDto(category, tags.getTags());
     }
 
     public void toggleVisibility(String userId, String categoryId) {
