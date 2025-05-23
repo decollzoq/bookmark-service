@@ -13,6 +13,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -33,7 +35,12 @@ public class AuthService {
         String accessToken = jwtTokenProvider.generateToken(user.getId());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
-        refreshTokenRepository.save(new RefreshToken(user.getId(), refreshToken));
+        refreshTokenRepository.save(
+                RefreshToken.builder()
+                        .userId(user.getId())
+                        .refreshToken(refreshToken)
+                        .createdAt(LocalDateTime.now())
+                        .build());
 
         return new LoginResponseDto(accessToken, refreshToken);
     }
@@ -47,7 +54,18 @@ public class AuthService {
             throw new UnauthorizedException("유효하지 않은 리프레시 토큰입니다.");
         }
 
+        refreshTokenRepository.delete(token);
+
         String newAccessToken = jwtTokenProvider.generateToken(userId);
-        return new LoginResponseDto(newAccessToken, refreshToken);
+        String newRefreshToken = jwtTokenProvider.generateRefreshToken(userId);
+
+        refreshTokenRepository.save(
+                RefreshToken.builder()
+                        .userId(userId)
+                        .refreshToken(refreshToken)
+                        .createdAt(LocalDateTime.now())
+                        .build());
+
+        return new LoginResponseDto(newAccessToken, newRefreshToken);
     }
 }
