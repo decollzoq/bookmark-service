@@ -3,6 +3,7 @@ package com.bookmarkservice.category.service;
 import com.bookmarkservice.bookmark.dto.BookmarkResponseDto;
 import com.bookmarkservice.bookmark.entity.Bookmark;
 import com.bookmarkservice.bookmark.repository.BookmarkRepository;
+import com.bookmarkservice.bookmark.service.BookmarkService;
 import com.bookmarkservice.category.dto.CategoryRequestDto;
 import com.bookmarkservice.category.dto.CategoryResponseDto;
 import com.bookmarkservice.category.dto.CategoryUpdateRequestDto;
@@ -30,6 +31,7 @@ public class CategoryService {
     private final ShareTokenService shareTokenService;
     private final BookmarkRepository bookmarkRepository;
     private final ShareTokenRepository shareTokenRepository;
+    private final BookmarkService bookmarkService;
 
     public CategoryResponseDto createCategory(String userId, CategoryRequestDto dto) {
         ResolvedTagsDto tags = tagService.resolveTagsFromNames(dto.getTagNames(), userId);
@@ -55,6 +57,15 @@ public class CategoryService {
                 })
                 .toList();
     }
+
+    public List<BookmarkResponseDto> getBookmarksByCategory(String userId, String categoryId) {
+        Category category = categoryRepository.findById(categoryId)
+                .filter(c -> c.getUserId().equals(userId))
+                .orElseThrow(() -> new NotFoundException("카테고리를 찾을 수 없습니다."));
+
+        return bookmarkService.getBookmarksByTagIds(userId, category.getTagIds());
+    }
+
 
     public CategoryResponseDto updateCategory(String userId, String categoryId, CategoryUpdateRequestDto dto) {
         Category category = categoryRepository.findById(categoryId)
