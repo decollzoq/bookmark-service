@@ -7,6 +7,7 @@ import com.bookmarkservice.category.repository.CategoryRepository;
 import com.bookmarkservice.common.exception.ConflictException;
 import com.bookmarkservice.common.exception.DuplicateTagException;
 import com.bookmarkservice.common.exception.NotFoundException;
+import com.bookmarkservice.tag.dto.ResolvedTagsDto;
 import com.bookmarkservice.tag.dto.TagRequestDto;
 import com.bookmarkservice.tag.dto.TagResponseDto;
 import com.bookmarkservice.tag.dto.TagUpdateRequestDto;
@@ -99,8 +100,10 @@ public class TagService {
                 .collect(Collectors.toList());
     }
 
-    public List<String> resolveTagIdsFromNames(List<String> tagNames, String userId) {
-        if (tagNames == null || tagNames.isEmpty()) return List.of();
+    public ResolvedTagsDto resolveTagsFromNames(List<String> tagNames, String userId) {
+        if (tagNames == null || tagNames.isEmpty()){
+            return new ResolvedTagsDto(List.of(), List.of());
+        }
 
         List<Tag> existingTags = tagRepository.findByUserIdAndNameInIgnoreCase(userId, tagNames);
 
@@ -121,8 +124,11 @@ public class TagService {
             tagRepository.saveAll(newTags);
         }
 
-        return Stream.concat(existingTags.stream(), newTags.stream())
-                .map(Tag::getId)
-                .toList();
+        List<Tag> allTags = Stream.concat(existingTags.stream(), newTags.stream()).toList();
+
+        List<String> tagIds = allTags.stream().map(Tag::getId).toList();
+        List<TagResponseDto> tagDtos = allTags.stream().map(TagResponseDto::new).toList();
+
+        return new ResolvedTagsDto(tagIds, tagDtos);
     }
 }

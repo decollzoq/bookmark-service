@@ -5,9 +5,10 @@ import com.bookmarkservice.bookmark.dto.BookmarkResponseDto;
 import com.bookmarkservice.bookmark.dto.BookmarkUpdateRequestDto;
 import com.bookmarkservice.bookmark.entity.Bookmark;
 import com.bookmarkservice.bookmark.repository.BookmarkRepository;
-import com.bookmarkservice.category.entity.Category;
-import com.bookmarkservice.category.repository.CategoryRepository;
+import com.bookmarkservice.tag.dto.TagResponseDto;
 import com.bookmarkservice.common.exception.NotFoundException;
+import com.bookmarkservice.tag.dto.ResolvedTagsDto;
+import com.bookmarkservice.tag.repository.TagRepository;
 import com.bookmarkservice.tag.service.TagService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,25 +22,24 @@ import java.util.stream.Collectors;
 public class BookmarkService {
 
     private final BookmarkRepository bookmarkRepository;
-    private final CategoryRepository categoryRepository;
     private final TagService tagService;
+    private final TagRepository tagRepository;
 
     public BookmarkResponseDto createBookmark(String userId, BookmarkRequestDto dto) {
-        List<String> tagIds = tagService.resolveTagIdsFromNames(dto.getTagNames(), userId);
-
+        ResolvedTagsDto resolvedTags = tagService.resolveTagsFromNames(dto.getTagNames(), userId);
         Bookmark bookmark = Bookmark.builder()
                 .userId(userId)
                 .url(dto.getUrl())
                 .title(dto.getTitle())
                 .description(dto.getDescription())
                 .favorite(dto.isFavorite())
-                .tagIds(tagIds)
+                .tagIds(resolvedTags.getTagIds())
                 .createdAt(LocalDateTime.now())
                 .build();
 
         bookmarkRepository.save(bookmark);
 
-        return new BookmarkResponseDto(bookmark, tagService.findTagsByIds(tagIds));
+        return new BookmarkResponseDto(bookmark, resolvedTags.getTags());
     }
 
     public List<BookmarkResponseDto> getAllBookmarks(String userId) {
@@ -54,19 +54,16 @@ public class BookmarkService {
     }
 
 
-    public List<BookmarkResponseDto> getBookmarksByCategoryTags(String userId, String categoryId) {
-        Category category = categoryRepository.findById(categoryId)
-                .filter(c -> c.getUserId().equals(userId))
-                .orElseThrow(() -> new NotFoundException("카테고리를 찾을 수 없습니다."));
-
-        List<Bookmark> bookmarks = bookmarkRepository.findByUserIdAndTagIdsInOrderByCreatedAtDesc(userId, category.getTagIds());
-
-        return bookmarks.stream()
+    public List<BookmarkResponseDto> getBookmarksByTagIds(String userId, List<String> tagIds) {
+        return bookmarkRepository.findByUserIdAndTagIdsInOrderByCreatedAtDesc(userId, tagIds)
+                .stream()
                 .map(b -> new BookmarkResponseDto(
                         b,
-                        tagService.findTagsByIds(b.getTagIds())
+                        tagRepository.findAllById(b.getTagIds()).stream()
+                                .map(TagResponseDto::new)
+                                .toList()
                 ))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public List<BookmarkResponseDto> getFavoriteBookmarks(String userId) {
@@ -101,12 +98,12 @@ public class BookmarkService {
         bookmark.setDescription(dto.getDescription());
         bookmark.setFavorite(dto.isFavorite());
 
-        List<String> tagIds = tagService.resolveTagIdsFromNames(dto.getTagNames(), userId);
-        bookmark.setTagIds(tagIds);
+        ResolvedTagsDto tags = tagService.resolveTagsFromNames(dto.getTagNames(), userId);
+        bookmark.setTagIds(tags.getTagIds());
 
         bookmarkRepository.save(bookmark);
 
-        return new BookmarkResponseDto(bookmark, tagService.findTagsByIds(tagIds));
+        return new BookmarkResponseDto(bookmark, tags.getTags());
     }
 
     public void toggleFavorite(String userId, String bookmarkId) {

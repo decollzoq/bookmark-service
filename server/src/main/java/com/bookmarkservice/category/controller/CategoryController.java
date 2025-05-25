@@ -1,7 +1,6 @@
 package com.bookmarkservice.category.controller;
 
 import com.bookmarkservice.bookmark.dto.BookmarkResponseDto;
-import com.bookmarkservice.bookmark.service.BookmarkService;
 import com.bookmarkservice.category.dto.CategoryRequestDto;
 import com.bookmarkservice.category.dto.CategoryResponseDto;
 import com.bookmarkservice.category.dto.CategoryUpdateRequestDto;
@@ -21,7 +20,6 @@ import java.util.List;
 public class CategoryController {
 
     private final CategoryService categoryService;
-    private final BookmarkService bookmarkService;
     private final ShareTokenService shareTokenService;
 
     // 사용자 카테고리 등록
@@ -65,7 +63,7 @@ public class CategoryController {
     public ResponseEntity<List<BookmarkResponseDto>> getBookmarksByCategory(
             @AuthenticationPrincipal String userId,
             @PathVariable String categoryId) {
-        return ResponseEntity.ok(bookmarkService.getBookmarksByCategoryTags(userId, categoryId));
+        return ResponseEntity.ok(categoryService.getBookmarksByCategory(userId, categoryId));
     }
 
     // 공유 받은 카테고리 조회
