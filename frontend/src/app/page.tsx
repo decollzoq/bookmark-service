@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useBookmarkStore } from '@/store/useBookmarkStore';
 import Link from 'next/link';
 import { Bookmark, Category, Tag } from '@/types';
 import categoryService from '@/api/categoryService';
+import bookmarkService from '@/api/bookmarkService';
 
 export default function Home() {
   const { 
@@ -27,6 +28,11 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [categoryBookmarks, setCategoryBookmarks] = useState<Bookmark[]>([]);
   const [isLoadingCategoryBookmarks, setIsLoadingCategoryBookmarks] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [publicSearchResults, setPublicSearchResults] = useState<Bookmark[]>([]);
+  const [isSearchingPublic, setIsSearchingPublic] = useState(false);
+  const [publicSearchError, setPublicSearchError] = useState<string | null>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
   
   // 컴포넌트 마운트 시 백엔드에서 북마크 데이터 로드
   useEffect(() => {
@@ -110,16 +116,144 @@ export default function Home() {
     fetchCategoryBookmarks();
   }, [activeCategory, currentUser]);
   
-  // 검색 필터링된 북마크
-  const filteredCategoryBookmarks = categoryBookmarks.filter(bookmark => {
-    if (!searchTerm) return true;
+  // 내 북마크 검색 결과 계산
+  const mySearchResults = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return [];
+    }
+
     const term = searchTerm.toLowerCase();
-    return (
+    return userBookmarks.filter(bookmark => 
       bookmark.title.toLowerCase().includes(term) || 
       bookmark.url.toLowerCase().includes(term) ||
       (bookmark.description?.toLowerCase().includes(term) || false)
     );
-  });
+  }, [searchTerm, userBookmarks]);
+
+  // 공개 북마크 검색 (통합 모드일 때)
+  useEffect(() => {
+    if (!searchTerm.trim() || !showIntegrated) {
+      setPublicSearchResults([]);
+      setIsSearchingPublic(false);
+      setPublicSearchError(null);
+      return;
+    }
+
+    const searchPublic = async () => {
+      const startTime = Date.now();
+      try {
+        setIsSearchingPublic(true);
+        setPublicSearchError(null);
+        
+        // 공개 북마크 검색 API 시도
+        let results;
+        let isUsingFallback = false;
+        
+        try {
+          results = await bookmarkService.searchAllBookmarks(searchTerm);
+        } catch (apiError: any) {
+          // API가 구현되지 않았거나 오류 발생 시 임시 처리
+          if (apiError.response?.status === 500 || apiError.response?.status === 404) {
+                                console.warn('공개 카테고리 검색 API가 아직 구현되지 않았습니다. 기존 API를 사용합니다.');
+            setPublicSearchError('공개 카테고리 검색 API 준비 중 (임시로 내 북마크 API 사용)');
+            // 기존 검색 API 사용 (임시)
+            results = await bookmarkService.searchBookmarks(searchTerm);
+            isUsingFallback = true;
+          } else {
+            throw apiError;
+          }
+        }
+        
+        // 백엔드 응답을 프론트엔드 Bookmark 형식으로 변환
+        const formattedResults: Bookmark[] = results.map(item => {
+          const tagList: Tag[] = (item.tags || item.tagNames || []).map(tag => ({
+            id: tag.id || `tag-${Math.random()}`,
+            name: tag.name,
+            userId: 'public' // 공개 북마크임을 표시
+          }));
+
+          return {
+            id: `integrated-${item.id}`, // 통합 검색 북마크 ID에 접두사 추가하여 충돌 방지
+            title: item.title,
+            url: item.url,
+            description: item.description || '',
+            categoryId: item.categoryId || null,
+            tagList: tagList,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt,
+            isFavorite: false, // 공개 북마크는 즐겨찾기 불가
+            userId: 'public',
+            integrated: true // 통합 검색 결과임을 표시
+          };
+        });
+        
+        setPublicSearchResults(formattedResults);
+      } catch (error) {
+        console.error('공개 북마크 검색 오류:', error);
+        setPublicSearchResults([]);
+        setPublicSearchError('공개 카테고리 검색 중 오류가 발생했습니다');
+      } finally {
+        // 최소 300ms 로딩 표시 후 종료 (깜빡임 방지)
+        const elapsed = Date.now() - startTime;
+        const minLoadTime = 300;
+        if (elapsed < minLoadTime) {
+          setTimeout(() => setIsSearchingPublic(false), minLoadTime - elapsed);
+        } else {
+          setIsSearchingPublic(false);
+        }
+      }
+    };
+
+    // 디바운싱을 위한 타이머
+    const timer = setTimeout(searchPublic, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm, showIntegrated]);
+
+  // 최종 검색 결과 (통합 모드에 따라 다름)
+  const searchResults = useMemo(() => {
+    if (!showIntegrated) {
+      return mySearchResults;
+    }
+    
+    // 통합 모드: 내 북마크 + 공개 북마크 (중복 제거)
+    const combined = [...mySearchResults];
+    const myBookmarkUrls = new Set(mySearchResults.map(b => b.url)); // URL로 중복 제거
+    
+    publicSearchResults.forEach(publicBookmark => {
+      // URL이 같지 않은 경우에만 추가 (중복 제거)
+      if (!myBookmarkUrls.has(publicBookmark.url)) {
+        combined.push(publicBookmark);
+      }
+    });
+    
+    return combined;
+  }, [mySearchResults, publicSearchResults, showIntegrated]);
+
+  // 검색 결과 표시 상태 관리
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setShowSearchResults(false);
+    } else {
+      setShowSearchResults(true);
+    }
+  }, [searchTerm]);
+
+  // 검색 상태가 아닐 때만 카테고리 북마크 표시
+  const filteredCategoryBookmarks = showSearchResults ? [] : categoryBookmarks;
+
+  // 검색창 외부 클릭 시 드롭다운 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   
   const handleShareBookmark = (bookmark: Bookmark) => {
     const shareLink = createShareLink({ bookmarkId: bookmark.id });
@@ -233,7 +367,7 @@ export default function Home() {
             <span className="ml-1">북마크 추가</span>
           </Link>
           
-          <div className="flex-1 relative">
+          <div className="flex-1 relative" ref={searchRef}>
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <span className="text-gray-500">🔎</span>
             </div>
@@ -242,8 +376,126 @@ export default function Home() {
               placeholder="북마크 검색..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onFocus={() => searchTerm && setShowSearchResults(true)}
               className="pl-10 pr-4 py-2 w-full border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-gray-300 bg-white"
             />
+            
+            {/* 검색 결과 드롭다운 */}
+            {showSearchResults && searchTerm && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto z-50">
+                {/* 로딩 표시 */}
+                {isSearchingPublic && showIntegrated && (
+                  <div className="p-3 border-b border-gray-100 bg-blue-50">
+                    <div className="flex items-center text-sm text-blue-600">
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-600 mr-2"></div>
+                      공개 카테고리 검색 중...
+                    </div>
+                  </div>
+                )}
+                
+                {/* 에러 표시 */}
+                {publicSearchError && showIntegrated && (
+                  <div className="p-3 border-b border-gray-100 bg-yellow-50">
+                    <div className="flex items-center text-sm text-yellow-700">
+                      <span className="mr-2">⚠️</span>
+                      {publicSearchError}
+                    </div>
+                  </div>
+                )}
+                
+                {/* 검색 모드 표시 */}
+                <div className="p-2 bg-gray-50 border-b border-gray-200">
+                  <p className="text-xs text-gray-600">
+                    {showIntegrated ? '📊 통합 검색: 내 북마크 + 공개 카테고리' : '👤 내 북마크만 검색'}
+                  </p>
+                </div>
+
+                {searchResults.length === 0 && !isSearchingPublic ? (
+                  <div className="p-4 text-center text-gray-500">
+                    검색 결과가 없습니다.
+                  </div>
+                ) : (
+                  <div className="py-2">
+                    {searchResults.map((bookmark) => (
+                      <div key={`${bookmark.id}-${bookmark.userId}`} className="px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <a 
+                                href={bookmark.url} 
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-gray-800 hover:text-blue-600 font-medium block truncate"
+                                onClick={() => setShowSearchResults(false)}
+                              >
+                                {bookmark.title}
+                              </a>
+                              {bookmark.integrated && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                  공개 카테고리
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500 truncate">{bookmark.url}</p>
+                            {bookmark.description && (
+                              <p className="text-xs text-gray-400 truncate mt-1">{bookmark.description}</p>
+                            )}
+                          </div>
+                          <div className="flex ml-2 space-x-1">
+                            {/* 내 북마크만 즐겨찾기와 편집 가능 */}
+                            {!bookmark.integrated && (
+                              <>
+                                <button
+                                  onClick={() => toggleFavorite(bookmark.id)}
+                                  className="p-1 text-sm"
+                                >
+                                  {bookmark.isFavorite ? (
+                                    <span className="text-yellow-400">★</span>
+                                  ) : (
+                                    <span className="text-gray-300">☆</span>
+                                  )}
+                                </button>
+                                <Link
+                                  href={`/bookmark/edit/${bookmark.id}`}
+                                  className="p-1 text-gray-600 hover:text-gray-900 text-sm"
+                                  onClick={() => setShowSearchResults(false)}
+                                >
+                                  ✎
+                                </Link>
+                              </>
+                            )}
+                            {/* 공개 카테고리 북마크는 복사 버튼만 */}
+                            {bookmark.integrated && (
+                              <button
+                                onClick={() => {
+                                  // 공개 카테고리 북마크를 내 북마크로 복사하는 기능 (추후 구현 가능)
+                                  navigator.clipboard.writeText(bookmark.url);
+                                  alert('URL이 클립보드에 복사되었습니다.');
+                                }}
+                                className="p-1 text-gray-600 hover:text-gray-900 text-sm"
+                                title="URL 복사"
+                              >
+                                📋
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* 검색 결과 닫기 버튼 */}
+                <div className="p-2 border-t border-gray-200 bg-gray-50">
+                  <button
+                    onClick={() => setShowSearchResults(false)}
+                    className="w-full text-center text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    검색 결과 닫기
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -365,11 +617,13 @@ export default function Home() {
         </div>
         
         <div className="p-4">
-          {filteredCategoryBookmarks.length === 0 ? (
+          {showSearchResults ? (
             <div className="py-6 text-center text-gray-500">
-              {searchTerm ? (
-                <p>검색 결과가 없습니다.</p>
-              ) : currentUser ? (
+              <p>검색창 위에 검색 결과를 확인하세요.</p>
+            </div>
+          ) : filteredCategoryBookmarks.length === 0 ? (
+            <div className="py-6 text-center text-gray-500">
+              {currentUser ? (
                 <div>
                   <p className="mb-2">북마크가 없습니다.</p>
                   <Link 

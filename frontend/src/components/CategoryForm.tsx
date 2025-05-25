@@ -33,6 +33,13 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSuccess 
   // 사용 가능한 태그 목록을 위한 상태 추가
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   
+  // category가 변경될 때 selectedTags 업데이트 (편집 시 필수)
+  useEffect(() => {
+    if (category?.tagList) {
+      setSelectedTags(category.tagList);
+    }
+  }, [category]);
+  
   // 컴포넌트 마운트 시 한 번만 사용자 태그 목록 설정
   useEffect(() => {
     // 사용 가능한 태그 목록 초기화

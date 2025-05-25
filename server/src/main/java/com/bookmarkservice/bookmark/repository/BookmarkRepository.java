@@ -12,5 +12,9 @@ public interface BookmarkRepository extends MongoRepository<Bookmark, String> {
     List<Bookmark> findByUserIdAndTagIdsInOrderByCreatedAtDesc(String userId, List<String> tagIds);
     List<Bookmark> findByUserIdAndFavoriteIsTrueOrderByCreatedAtDesc(String userId);
     List<Bookmark> findByUserIdAndTagIdsContaining(String userId, String tagId);
+    
+    // 전체 북마크 검색 메서드들 (카테고리 기반 필터링용)
+    List<Bookmark> findByTitleContainingIgnoreCase(String keyword);
+    List<Bookmark> findByDescriptionContainingIgnoreCase(String keyword);
 }
 

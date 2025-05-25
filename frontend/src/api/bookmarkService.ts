@@ -49,6 +49,18 @@ const bookmarkService = {
     const response = await apiClient.get<BookmarkResponse[]>(`/api/bookmarks/search?keyword=${encodeURIComponent(keyword)}`);
     return response.data;
   },
+
+  // 공개 북마크 검색 (통합 검색용)
+  searchPublicBookmarks: async (keyword: string): Promise<BookmarkResponse[]> => {
+    const response = await apiClient.get<BookmarkResponse[]>(`/api/bookmarks/search/public?keyword=${encodeURIComponent(keyword)}`);
+    return response.data;
+  },
+
+  // 통합 검색 (내 북마크 + 공개 카테고리 북마크)
+  searchAllBookmarks: async (keyword: string): Promise<BookmarkResponse[]> => {
+    const response = await apiClient.get<BookmarkResponse[]>(`/api/bookmarks/search/public-categories?keyword=${encodeURIComponent(keyword)}`);
+    return response.data;
+  },
   
   // 즐겨찾기한 북마크 조회
   getFavoriteBookmarks: async (): Promise<BookmarkResponse[]> => {

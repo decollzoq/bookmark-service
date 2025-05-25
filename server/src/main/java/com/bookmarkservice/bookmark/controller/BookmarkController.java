@@ -41,6 +41,13 @@ public class BookmarkController {
         return ResponseEntity.ok(bookmarkService.searchBookmarks(userId, keyword));
     }
 
+    // 공개 카테고리 북마크 검색 (인증 불필요)
+    @GetMapping("/search/public-categories")
+    public ResponseEntity<List<BookmarkResponseDto>> searchPublicCategories(
+            @RequestParam("keyword") String keyword) {
+        return ResponseEntity.ok(bookmarkService.searchPublicCategoryBookmarks(keyword));
+    }
+
     // 즐겨찾기한 사용자 북마크 조회
     @GetMapping("/favorites")
     public ResponseEntity<List<BookmarkResponseDto>> getFavorites(

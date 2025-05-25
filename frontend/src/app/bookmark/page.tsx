@@ -191,13 +191,13 @@ export default function BookmarksPage() {
                     
                     {/* ID 값이 유효한 경우에만 Link 컴포넌트를 렌더링, key 속성 제거 */}
                     {bookmark.id ? (
-                      <Link
-                        href={`/bookmark/edit/${bookmark.id}`}
-                        className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-                        title="수정"
-                      >
-                        ✎
-                      </Link>
+                    <Link
+                      href={`/bookmark/edit/${bookmark.id}`}
+                      className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                      title="수정"
+                    >
+                      ✎
+                    </Link>
                     ) : (
                       <button
                         className="p-1 rounded hover:bg-gray-100 text-gray-300 cursor-not-allowed"

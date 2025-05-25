@@ -10,12 +10,15 @@ import com.bookmarkservice.common.exception.NotFoundException;
 import com.bookmarkservice.tag.dto.ResolvedTagsDto;
 import com.bookmarkservice.tag.repository.TagRepository;
 import com.bookmarkservice.tag.service.TagService;
+import com.bookmarkservice.category.repository.CategoryRepository;
+import com.bookmarkservice.category.entity.Category;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +27,7 @@ public class BookmarkService {
     private final BookmarkRepository bookmarkRepository;
     private final TagService tagService;
     private final TagRepository tagRepository;
+    private final CategoryRepository categoryRepository;
 
     public BookmarkResponseDto createBookmark(String userId, BookmarkRequestDto dto) {
         ResolvedTagsDto resolvedTags = tagService.resolveTagsFromNames(dto.getTagNames(), userId);
@@ -81,6 +85,47 @@ public class BookmarkService {
         List<Bookmark> bookmarks = bookmarkRepository.findByUserIdAndTitleContainingIgnoreCase(userId, keyword);
 
         return bookmarks.stream()
+                .map(b -> new BookmarkResponseDto(
+                        b,
+                        tagService.findTagsByIds(b.getTagIds())
+                ))
+                .collect(Collectors.toList());
+    }
+
+    // 공개 카테고리 북마크 검색
+    public List<BookmarkResponseDto> searchPublicCategoryBookmarks(String keyword) {
+        // 1. 공개 카테고리들 조회
+        List<Category> publicCategories = categoryRepository.findByIsPublicTrueAndTitleContainingIgnoreCase(keyword);
+        
+        // 2. 공개 카테고리들의 태그 ID 수집
+        List<String> publicTagIds = publicCategories.stream()
+                .flatMap(category -> category.getTagIds().stream())
+                .distinct()
+                .collect(Collectors.toList());
+        
+        if (publicTagIds.isEmpty()) {
+            return List.of(); // 공개 카테고리가 없으면 빈 리스트 반환
+        }
+        
+        // 3. 해당 태그들을 가진 북마크들 조회
+        List<Bookmark> titleMatches = bookmarkRepository.findByTitleContainingIgnoreCase(keyword);
+        List<Bookmark> descriptionMatches = bookmarkRepository.findByDescriptionContainingIgnoreCase(keyword);
+        
+        // 4. 중복 제거하여 합치기
+        List<Bookmark> allMatches = Stream.concat(titleMatches.stream(), descriptionMatches.stream())
+                .distinct()
+                .collect(Collectors.toList());
+
+        // 5. 공개 카테고리의 태그를 포함한 북마크만 필터링
+        return allMatches.stream()
+                .filter(bookmark -> {
+                    if (bookmark.getTagIds() == null || bookmark.getTagIds().isEmpty()) {
+                        return false;
+                    }
+                    // 북마크의 태그 중 하나라도 공개 카테고리의 태그와 일치하면 포함
+                    return bookmark.getTagIds().stream()
+                            .anyMatch(publicTagIds::contains);
+                })
                 .map(b -> new BookmarkResponseDto(
                         b,
                         tagService.findTagsByIds(b.getTagIds())

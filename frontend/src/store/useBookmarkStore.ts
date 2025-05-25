@@ -241,19 +241,48 @@ export const useBookmarkStore = create<BookmarkState>()(
           const categories: Category[] = response.map(item => {
             // 태그 데이터 처리 (tags 또는 tagNames 필드 모두 처리)
             const tagData = item.tags || item.tagNames || [];
+            const currentTags = get().tags; // 현재 tags 배열 가져오기
+            
             // 태그 데이터 변환 (문자열 또는 객체 형식 모두 처리)
             const tagList = tagData.map((tagItem: any) => {
               // 문자열인 경우 (태그 이름만 있는 경우)
               if (typeof tagItem === 'string') {
+                // 기존 태그에서 같은 이름의 태그 찾기
+                const existingTag = currentTags.find(tag => 
+                  tag.name === tagItem && tag.userId === currentUser.id
+                );
+                
+                if (existingTag) {
+                  return existingTag; // 기존 태그 사용
+                }
+                
                 return {
-                  id: `tag-${Math.random()}`,
+                  id: `tag-${tagItem.toLowerCase().replace(/\s+/g, '-')}-${currentUser.id}`, // 일관된 ID 생성
                   name: tagItem,
                   userId: currentUser.id
                 };
               }
               // 객체인 경우 (id와 name이 있는 경우)
+              if (tagItem.id) {
+                // ID가 있는 경우 그대로 사용
+                return {
+                  id: tagItem.id,
+                  name: tagItem.name || '무제 태그',
+                  userId: currentUser.id
+                };
+              }
+              
+              // ID가 없는 객체인 경우 기존 태그 찾기
+              const existingTag = currentTags.find(tag => 
+                tag.name === tagItem.name && tag.userId === currentUser.id
+              );
+              
+              if (existingTag) {
+                return existingTag;
+              }
+              
               return {
-                id: tagItem.id || `tag-${Math.random()}`,
+                id: `tag-${tagItem.name.toLowerCase().replace(/\s+/g, '-')}-${currentUser.id}`,
                 name: tagItem.name || '무제 태그',
                 userId: currentUser.id
               };
