@@ -42,30 +42,17 @@ export default function LoginPage() {
     
     try {
       // 디버깅: API 요청 직접 시도
-      console.log('로그인 시도:', { email: formData.email });
-      console.log('현재 baseURL 설정:', '/auth');
-      
       // 로그인 처리
       await login(formData.email, formData.password);
       
       // 로그인 성공 시 메인 페이지로 리다이렉트
       router.push('/');
     } catch (err) {
-      console.error('로그인 오류 상세 정보:', err);
-      
       // 디버깅: 오류 객체 자세히 검사
       if (err instanceof Error) {
-        console.log('에러 이름:', err.name);
-        console.log('에러 메시지:', err.message);
-        console.log('에러 스택:', err.stack);
-        
         // Axios 오류인 경우 더 자세한 정보 추출
         if (err.name === 'AxiosError') {
           const axiosErr = err as any;
-          console.log('Axios 에러 코드:', axiosErr.code);
-          console.log('Axios 응답 데이터:', axiosErr.response?.data);
-          console.log('Axios 응답 상태:', axiosErr.response?.status);
-          console.log('Axios 요청 설정:', axiosErr.config);
         }
         
         // 인증이 필요한 경우

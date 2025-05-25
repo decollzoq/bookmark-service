@@ -42,43 +42,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const currentTime = Date.now() / 1000;
           
           if (decoded.exp && decoded.exp < currentTime) {
-            console.log('만료된 토큰, 로그아웃 처리');
             await logout();
             return;
           }
           
           // localStorage에서 저장된 이메일 가져오기
           const userEmail = safeGetItem('userEmail');
-          console.log('AuthProvider: 저장된 이메일:', userEmail);
-          
           if (!userEmail) {
-            console.error('AuthProvider: 저장된 이메일 없음');
             await logout();
             return;
           }
           
-          // 토큰에서 ID 추출
+          // 토큰에서 정보 추출
           const userId = decoded.sub || 'user-id';
-          // 사용자 이름은 이메일의 @ 앞부분
-          const username = userEmail.split('@')[0];
+          // 토큰에서 닉네임 정보 추출 - 백엔드에서 설정한 nickname 필드를 우선 사용
+          const nickname = decoded.nickname || decoded.username;
           
           // 직접 사용자 정보 구성
           const userFromEmail = {
             id: userId,
-            username: username,
+            username: nickname || userEmail, // nickname을 username 필드에 매핑, 없는 경우에만 이메일 사용
             email: userEmail
           };
           
           // 사용자 정보 설정
           useBookmarkStore.setState({ currentUser: userFromEmail });
-          console.log('AuthProvider: 로그인 상태 복원:', userFromEmail);
         } catch (decodeError) {
-          console.error('토큰 디코딩 실패:', decodeError);
           // 오류 발생 시 로그아웃
           await logout();
         }
       } catch (error) {
-        console.error('인증 초기화 오류:', error);
       }
     };
     

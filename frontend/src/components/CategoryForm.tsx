@@ -40,8 +40,6 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSuccess 
       tag => !selectedTags.some(selected => selected.id === tag.id)
     );
     setAvailableTags(filteredTags);
-    
-    console.log('카테고리 폼 - 마운트 시 초기화: 사용 가능한 태그 수:', filteredTags.length);
   }, []);
   
   // selectedTags만 의존성 배열에 포함하여 무한 루프 방지
@@ -51,8 +49,6 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSuccess 
       tag => !selectedTags.some(selected => selected.id === tag.id)
     );
     setAvailableTags(filteredTags);
-    
-    console.log('카테고리 폼 - 태그 선택 변경: 사용 가능한 태그 수:', filteredTags.length);
   }, [selectedTags]);
   
   const handleAddTag = async () => {
@@ -70,7 +66,6 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSuccess 
     if (existingTag) {
       // 이미 선택된 태그인지 다시 확인 
       if (selectedTags.some(tag => tag.id === existingTag.id)) {
-        console.log('이미 선택된 태그입니다:', existingTag.name);
         setErrors({...errors, tag: '이미 추가된 태그입니다'});
         return;
       }
@@ -115,7 +110,6 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSuccess 
         
         setErrors({...errors, tag: undefined});
       } catch (error) {
-        console.error('태그 추가 실패:', error);
         setErrors({...errors, tag: '태그 추가 중 오류가 발생했습니다'});
       }
     }
@@ -142,13 +136,8 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSuccess 
     e.preventDefault();
     
     if (!validateForm()) return;
-    
-    console.log('카테고리 폼 제출', { title, isPublic });
-    console.log('선택된 태그:', selectedTags);
-    
     if (category) {
       // 수정
-      console.log(`카테고리 수정: ${category.id}`);
       updateCategory(category.id, {
         title,
         tagList: selectedTags,
@@ -156,7 +145,6 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSuccess 
       });
     } else {
       // 새 카테고리 추가
-      console.log('새 카테고리 추가');
       addCategory({
         title,
         tagList: selectedTags,
@@ -259,12 +247,10 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSuccess 
                   key={tag.id || `tag-option-${Math.random()}`}
                     type="button"
                   onClick={() => {
-                    console.log('기존 태그 클릭:', tag.name);
                     // 새 선택된 태그 배열 생성
                     const newSelectedTags = [...selectedTags, tag];
                     // 상태 업데이트 (이렇게 하면 리렌더링 발생)
                     setSelectedTags(newSelectedTags);
-                    console.log('태그 추가 후 선택된 태그:', newSelectedTags.map(t => t.name));
                   }}
                     className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs hover:bg-gray-200"
                   >

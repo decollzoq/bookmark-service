@@ -10,6 +10,12 @@ export interface Tag {
   userId: string;
 }
 
+// API 응답에서 받을 수 있는 태그 타입
+export interface ApiTag {
+  id: string;
+  name: string;
+}
+
 export interface Category {
   id: string;
   title: string;

@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useBookmarkStore } from '@/store/useBookmarkStore';
 import Link from 'next/link';
-import { Bookmark, Category } from '@/types';
+import { Bookmark, Category, Tag } from '@/types';
+import categoryService from '@/api/categoryService';
 
 export default function Home() {
   const { 
@@ -16,13 +17,16 @@ export default function Home() {
     getUserBookmarks,
     getUserCategories,
     loadUserBookmarks,
-    loadUserCategories
+    loadUserCategories,
+    getCategoryBookmarks
   } = useBookmarkStore();
   
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showIntegrated, setShowIntegrated] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [categoryBookmarks, setCategoryBookmarks] = useState<Bookmark[]>([]);
+  const [isLoadingCategoryBookmarks, setIsLoadingCategoryBookmarks] = useState(false);
   
   // 컴포넌트 마운트 시 백엔드에서 북마크 데이터 로드
   useEffect(() => {
@@ -34,7 +38,6 @@ export default function Home() {
           await loadUserCategories();
         }
       } catch (error) {
-        console.error('데이터 로드 오류:', error);
       } finally {
         setIsLoading(false);
       }
@@ -57,23 +60,61 @@ export default function Home() {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 10);
   
-  // 카테고리별 북마크
-  const categoryBookmarks = activeCategory 
-    ? userBookmarks.filter(bookmark => {
-        const category = userCategories.find(c => c.id === activeCategory);
-        if (!category) return false;
+  // 카테고리 변경 시 해당 카테고리의 북마크 로드하는 useEffect 추가
+  useEffect(() => {
+    const fetchCategoryBookmarks = async () => {
+      // 선택된 카테고리가 없으면 전체 북마크를 표시
+      if (!activeCategory) {
+        setCategoryBookmarks(userBookmarks);
+        return;
+      }
+      
+      try {
+        setIsLoadingCategoryBookmarks(true);
+        // 백엔드 API 직접 호출하여 카테고리에 할당된 북마크 가져오기
+        const bookmarksData = await categoryService.getBookmarksByCategory(activeCategory);
         
-        return bookmark.tagList.some(bookmarkTag => 
-          category.tagList.some(categoryTag => categoryTag.id === bookmarkTag.id)
-        );
-      })
-    : userBookmarks;
+        // API 응답을 프론트엔드 Bookmark 형식으로 변환
+        const formattedBookmarks: Bookmark[] = bookmarksData.map(item => {
+          // 태그 변환: 백엔드 태그를 프론트엔드 Tag 형식으로 변환
+          const tagList: Tag[] = (item.tags || []).map(tag => ({
+            id: tag.id || `tag-${Math.random()}`,
+            name: tag.name,
+            userId: currentUser?.id || ''
+          }));
+          
+          return {
+            id: item.id,
+            title: item.title,
+            url: item.url,
+            description: item.description || '',
+            categoryId: item.categoryId || null,
+            tagList: tagList,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt,
+            isFavorite: item.isFavorite || false,
+            userId: currentUser?.id || '',
+            integrated: false
+          };
+        });
+        
+        setCategoryBookmarks(formattedBookmarks);
+      } catch (error) {
+        console.error('카테고리 북마크 로드 에러:', error);
+        setCategoryBookmarks([]);
+      } finally {
+        setIsLoadingCategoryBookmarks(false);
+      }
+    };
+    
+    fetchCategoryBookmarks();
+  }, [activeCategory, currentUser]);
   
   // 검색 필터링된 북마크
   const filteredCategoryBookmarks = categoryBookmarks.filter(bookmark => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
-  return (
+    return (
       bookmark.title.toLowerCase().includes(term) || 
       bookmark.url.toLowerCase().includes(term) ||
       (bookmark.description?.toLowerCase().includes(term) || false)
@@ -95,11 +136,9 @@ export default function Home() {
           alert('북마크 링크가 클립보드에 복사되었습니다.');
         })
         .catch((error) => {
-          console.error('클립보드 복사 실패:', error);
           alert(`북마크 링크: ${fullShareUrl} (수동으로 복사해주세요)`);
         });
     } catch (err) {
-      console.error('클립보드 API 오류:', err);
       alert(`북마크 링크: ${fullShareUrl} (수동으로 복사해주세요)`);
     }
   };

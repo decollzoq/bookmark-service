@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useBookmarkStore, useHydration } from '@/store/useBookmarkStore';
-import { Bookmark, Category } from '@/types';
+import { Bookmark, Category, Tag } from '@/types';
+import categoryService from '@/api/categoryService';
 
 interface BookmarkListProps {
   categoryId?: string;
@@ -23,11 +24,66 @@ export const BookmarkList: React.FC<BookmarkListProps> = ({ categoryId }) => {
   const [mounted, setMounted] = useState(false);
   const [sortOption, setSortOption] = useState<string>('updatedAt');
   const [filterText, setFilterText] = useState<string>('');
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   
   // 클라이언트 사이드에서만 마운트 설정
   useEffect(() => {
     setMounted(true);
   }, []);
+  
+  // 북마크 데이터 로드
+  useEffect(() => {
+    const loadBookmarks = async () => {
+      if (!mounted || !isHydrated) return;
+      
+      try {
+        setIsLoading(true);
+        
+        if (categoryId) {
+          // 백엔드 API를 통해 카테고리별 북마크 가져오기
+          const response = await categoryService.getBookmarksByCategory(categoryId);
+          
+          // API 응답을 프론트엔드 Bookmark 형식으로 변환
+          const formattedBookmarks: Bookmark[] = response.map(item => {
+            // 태그 변환
+            const tagList: Tag[] = (item.tags || []).map(tag => ({
+              id: tag.id || `tag-${Math.random()}`,
+              name: tag.name,
+              userId: currentUser?.id || ''
+            }));
+            
+            return {
+              id: item.id,
+              title: item.title,
+              url: item.url,
+              description: item.description || '',
+              categoryId: item.categoryId || null,
+              tagList: tagList,
+              createdAt: item.createdAt,
+              updatedAt: item.updatedAt,
+              isFavorite: item.isFavorite || false,
+              userId: currentUser?.id || '',
+              integrated: false
+            };
+          });
+          
+          setBookmarks(formattedBookmarks);
+        } else {
+          // 전체 북마크는 스토어에서 가져오기
+          const userBookmarks = getUserBookmarks();
+          setBookmarks(userBookmarks);
+        }
+      } catch (error) {
+        console.error('북마크를 가져오는 중 오류 발생:', error);
+        setBookmarks([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadBookmarks();
+  }, [categoryId, currentUser, isHydrated, mounted]);
   
   // 하이드레이션이 완료되기 전 또는 마운트되기 전에는 간단한 로딩 UI 표시
   if (!isHydrated || !mounted) {
@@ -38,32 +94,18 @@ export const BookmarkList: React.FC<BookmarkListProps> = ({ categoryId }) => {
     );
   }
   
-  // 북마크 가져오기 (카테고리 별 또는 전체)
-  let filteredBookmarks = [];
-  
-  if (categoryId) {
-    // 특정 카테고리의 북마크 (태그 매칭 포함 - 항상 표시)
-    console.log(`카테고리 ID ${categoryId}의 북마크 로드 중...`);
-    filteredBookmarks = getCategoryBookmarks(categoryId);
-    console.log(`카테고리 ID ${categoryId}의 북마크 ${filteredBookmarks.length}개 로드됨`);
-    
-    // 북마크 로깅
-    if (filteredBookmarks.length > 0) {
-      console.log('카테고리에 속한 북마크 목록:');
-      filteredBookmarks.forEach((bookmark, index) => {
-        console.log(`${index + 1}. ${bookmark.title} (ID: ${bookmark.id})`);
-        console.log(`   태그: ${bookmark.tagList.map(t => t.name).join(', ')}`);
-      });
-    } else {
-      console.log('카테고리에 속한 북마크 없음');
-    }
-  } else {
-    // 전체 북마크
-    filteredBookmarks = getUserBookmarks();
+  // 로딩 중 표시
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-amber-600"></div>
+        <span className="ml-3">북마크를 불러오는 중...</span>
+      </div>
+    );
   }
   
   // 검색어로 추가 필터링
-  filteredBookmarks = filteredBookmarks.filter(bookmark => 
+  const filteredBookmarks = bookmarks.filter(bookmark => 
     bookmark.title.toLowerCase().includes(filterText.toLowerCase()) ||
     bookmark.url.toLowerCase().includes(filterText.toLowerCase()) ||
     bookmark.description?.toLowerCase().includes(filterText.toLowerCase()) ||
@@ -84,6 +126,8 @@ export const BookmarkList: React.FC<BookmarkListProps> = ({ categoryId }) => {
   const handleDeleteBookmark = (bookmark: Bookmark) => {
     if (window.confirm(`"${bookmark.title}" 북마크를 삭제하시겠습니까?`)) {
       deleteBookmark(bookmark.id);
+      // 목록에서도 삭제
+      setBookmarks(prev => prev.filter(b => b.id !== bookmark.id));
     }
   };
   
@@ -96,14 +140,18 @@ export const BookmarkList: React.FC<BookmarkListProps> = ({ categoryId }) => {
 
   // 태그 매칭 여부 확인 (강조 표시용)
   const isTagMatched = (bookmark: Bookmark, catId: string): boolean => {
-    if (bookmark.categoryId === catId) return false; // 직접 연결된 북마크는 제외
+    // 직접 연결된 북마크는 제외
+    if (bookmark.categoryId === catId) return false;
     
+    // 카테고리 찾기
     const category = categories.find(c => c.id === catId);
     if (!category || !category.tagList || category.tagList.length === 0) return false;
     
-    return bookmark.tagList.some(bTag => 
-      category.tagList.some(cTag => cTag.id === bTag.id)
-    );
+    // 카테고리 태그 ID 집합 생성
+    const categoryTagIds = new Set(category.tagList.map(tag => tag.id));
+    
+    // 북마크 태그 중 하나라도 카테고리 태그와 일치하는지 확인
+    return bookmark.tagList.some(tag => categoryTagIds.has(tag.id));
   };
   
   return (

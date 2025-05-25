@@ -77,9 +77,6 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   }
   
   // 콘솔에 카테고리 정보와 태그 출력 (디버깅용)
-  console.log('카테고리 정보:', category);
-  console.log('카테고리 태그:', category.tagList);
-  
   // 카테고리 공유 링크 생성
   const handleShareCategory = () => {
     try {
@@ -104,7 +101,6 @@ export default function CategoryPage({ params }: CategoryPageProps) {
             });
           })
           .catch(error => {
-            console.error('클립보드 복사 실패:', error);
             toast.error('클립보드 복사에 실패했습니다.', { 
               duration: 3000,
               position: 'bottom-center',

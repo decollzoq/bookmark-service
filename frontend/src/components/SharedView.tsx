@@ -27,25 +27,16 @@ export const SharedView: React.FC<SharedViewProps> = ({ uuid }) => {
   
   useEffect(() => {
     setLoading(true);
-    
-    console.log("UUID:", uuid);
-    console.log("SharedLinks:", sharedLinks);
-    console.log("Categories:", categories);
-    console.log("Bookmarks:", bookmarks);
-    
     const directCategoryId = searchParams.get('categoryId');
     const directBookmarkId = searchParams.get('bookmarkId');
     
     const isDemoMode = searchParams.get('demo') === 'true';
     
     if (directCategoryId || directBookmarkId || isDemoMode) {
-      console.log("임시 공유 모드 활성화:", { directCategoryId, directBookmarkId, isDemoMode });
-      
       if (directBookmarkId) {
         const bookmark = bookmarks.find(b => b.id === directBookmarkId);
         
         if (bookmark) {
-          console.log("URL 파라미터로 찾은 북마크:", bookmark);
           setData({
             type: 'bookmark',
             title: bookmark.title,
@@ -58,16 +49,14 @@ export const SharedView: React.FC<SharedViewProps> = ({ uuid }) => {
         const category = categories.find(c => c.id === directCategoryId);
         
         if (category) {
-          console.log("URL 파라미터로 찾은 카테고리:", category);
-          
           const categoryBookmarks = bookmarks.filter(bookmark => {
             if (!bookmark.tagList || bookmark.tagList.length === 0) {
               return false;
             }
             
-            return bookmark.tagList.some(bookmarkTag => 
-              category.tagList.some(categoryTag => categoryTag.id === bookmarkTag.id)
-            );
+            const categoryTagIds = new Set(category.tagList.map(tag => tag.id));
+            
+            return bookmark.tagList.some(tag => categoryTagIds.has(tag.id));
           });
           
           setData({
@@ -87,9 +76,9 @@ export const SharedView: React.FC<SharedViewProps> = ({ uuid }) => {
               return false;
             }
             
-            return bookmark.tagList.some(bookmarkTag => 
-              demoCategory.tagList.some(categoryTag => categoryTag.id === bookmarkTag.id)
-            );
+            const categoryTagIds = new Set(demoCategory.tagList.map(tag => tag.id));
+            
+            return bookmark.tagList.some(tag => categoryTagIds.has(tag.id));
           });
           
           if (demoBookmarks.length === 0 && bookmarks.length > 0) {
@@ -114,26 +103,18 @@ export const SharedView: React.FC<SharedViewProps> = ({ uuid }) => {
     const shareLink = sharedLinks.find(link => link.uuid === uuid);
     
     if (!shareLink) {
-      console.error("공유 링크를 찾을 수 없음:", uuid);
       setError('유효하지 않은 공유 링크입니다. 아래 방법을 시도해보세요:<br/><ol class="mt-2 text-left list-decimal pl-5"><li>동일한 브라우저에서 링크를 열기</li><li>카테고리 ID로 직접 접근: <code>/share/123?categoryId=실제ID</code></li><li>데모 모드 활성화: <code>/share/demo?demo=true</code></li></ol>');
       setLoading(false);
       return;
     }
-    
-    console.log("찾은 공유 링크:", shareLink);
-    
     if (shareLink.bookmarkId) {
       const bookmark = bookmarks.find(b => b.id === shareLink.bookmarkId);
       
       if (!bookmark) {
-        console.error("북마크를 찾을 수 없음:", shareLink.bookmarkId);
         setError('해당 북마크를 찾을 수 없습니다.');
         setLoading(false);
         return;
       }
-      
-      console.log("찾은 북마크:", bookmark);
-      
       setData({
         type: 'bookmark',
         title: bookmark.title,
@@ -143,21 +124,16 @@ export const SharedView: React.FC<SharedViewProps> = ({ uuid }) => {
       const category = categories.find(c => c.id === shareLink.categoryId);
       
       if (!category) {
-        console.error("카테고리를 찾을 수 없음:", shareLink.categoryId);
         setError('해당 카테고리를 찾을 수 없습니다.');
         setLoading(false);
         return;
       }
       
       if (!category.isPublic) {
-        console.error("카테고리가 비공개 상태:", category);
         setError('이 카테고리는 비공개 상태입니다.');
         setLoading(false);
         return;
       }
-      
-      console.log("찾은 카테고리:", category);
-      
       if (category.tagList.length === 0) {
         console.warn("카테고리에 태그가 없음:", category);
         setData({
@@ -171,13 +147,10 @@ export const SharedView: React.FC<SharedViewProps> = ({ uuid }) => {
             return false;
           }
           
-          return bookmark.tagList.some(bookmarkTag => 
-            category.tagList.some(categoryTag => categoryTag.id === bookmarkTag.id)
-          );
+          const categoryTagIds = new Set(category.tagList.map(tag => tag.id));
+          
+          return bookmark.tagList.some(tag => categoryTagIds.has(tag.id));
         });
-        
-        console.log("매칭된 북마크:", categoryBookmarks);
-        
         setData({
           type: 'category',
           title: category.title,
@@ -185,7 +158,6 @@ export const SharedView: React.FC<SharedViewProps> = ({ uuid }) => {
         });
       }
     } else {
-      console.error("shareLink에 bookmarkId와 categoryId가 모두 없음:", shareLink);
       setError('올바르지 않은 공유 링크입니다.');
     }
     
@@ -205,7 +177,6 @@ export const SharedView: React.FC<SharedViewProps> = ({ uuid }) => {
         }
       }, 1500);
     } catch (err) {
-      console.error('Error importing item:', err);
       if (err instanceof Error) {
         setError(err.message);
       } else {

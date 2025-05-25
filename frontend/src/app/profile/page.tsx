@@ -26,10 +26,7 @@ export default function ProfilePage() {
     if (currentUser) {
       // localStorage에서 저장된 이메일 가져오기
       const storedEmail = localStorage.getItem('userEmail');
-      
-      console.log('현재 유저 정보:', currentUser);
-      console.log('로컬 스토리지 이메일:', storedEmail);
-      
+
       setUsername(currentUser.username);
       
       // 저장된 이메일이 있으면 그것을 사용, 없으면 currentUser.email 사용

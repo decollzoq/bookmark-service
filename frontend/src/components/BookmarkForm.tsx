@@ -42,8 +42,6 @@ export const BookmarkForm: React.FC<BookmarkFormProps> = ({ bookmark, onSuccess 
       tag => !selectedTags.some(selected => selected.id === tag.id)
     );
     setAvailableTags(filteredTags);
-    
-    console.log('북마크 폼 - 마운트 시 초기화: 사용 가능한 태그 수:', filteredTags.length);
   }, []);
   
   // selectedTags만 의존성 배열에 포함하여 무한 루프 방지
@@ -53,8 +51,6 @@ export const BookmarkForm: React.FC<BookmarkFormProps> = ({ bookmark, onSuccess 
       tag => !selectedTags.some(selected => selected.id === tag.id)
     );
     setAvailableTags(filteredTags);
-    
-    console.log('북마크 폼 - 태그 선택 변경: 사용 가능한 태그 수:', filteredTags.length);
   }, [selectedTags]);
   
   // URL 자동 채우기 기능
@@ -82,7 +78,6 @@ export const BookmarkForm: React.FC<BookmarkFormProps> = ({ bookmark, onSuccess 
         alert("클립보드 접근 권한이 없습니다. 보안 정책으로 인해 수동으로 URL을 입력해주세요.");
       }
     } catch (err) {
-      console.error('URL 붙여넣기 실패:', err);
     }
   };
   
@@ -101,26 +96,19 @@ export const BookmarkForm: React.FC<BookmarkFormProps> = ({ bookmark, onSuccess 
     if (existingTag) {
       // 이미 선택된 태그인지 다시 확인
       if (selectedTags.some(tag => tag.id === existingTag.id)) {
-        console.log('북마크 폼 - 이미 선택된 태그입니다:', existingTag.name);
         setErrors({...errors, tag: '이미 추가된 태그입니다'});
         return;
       }
-      
-      console.log('북마크 폼 - 기존 태그 추가:', existingTag.name);
       const newSelectedTags = [...selectedTags, existingTag];
       setSelectedTags(newSelectedTags);
       setErrors({...errors, tag: undefined});
     } else {
       try {
-        console.log('북마크 폼 - 새 태그 추가 시도:', newTagName);
         const newTag = await addTag(newTagName);
-        console.log('북마크 폼 - 새 태그 생성됨:', newTag.name);
-        
         const newSelectedTags = [...selectedTags, newTag];
         setSelectedTags(newSelectedTags);
         setErrors({...errors, tag: undefined});
       } catch (error) {
-        console.error('북마크 폼 - 태그 추가 실패:', error);
         setErrors({...errors, tag: '태그 추가에 실패했습니다'});
         return;
       }
@@ -305,7 +293,6 @@ export const BookmarkForm: React.FC<BookmarkFormProps> = ({ bookmark, onSuccess 
                   key={tag.id || `tag-option-${Math.random()}`}
                     type="button"
                   onClick={() => {
-                    console.log('북마크 폼 - 기존 태그 클릭:', tag.name);
                     const newSelectedTags = [...selectedTags, tag];
                     setSelectedTags(newSelectedTags);
                   }}

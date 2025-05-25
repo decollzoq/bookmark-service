@@ -56,8 +56,6 @@ export default function RegisterPage() {
     
     try {
       // 실제 API 호출로 변경
-      console.log('인증 코드 요청:', formData.email);
-      
       await emailService.sendVerificationCode(formData.email);
       
       // 인증 코드 입력 단계로 이동
@@ -65,7 +63,6 @@ export default function RegisterPage() {
       setMessage('인증 코드가 이메일로 발송되었습니다. 이메일을 확인해주세요.');
       setIsVerificationSent(true);
     } catch (err) {
-      console.error('인증 코드 요청 오류:', err);
       if (err instanceof Error) {
         const errorMessage = err.message.toLowerCase();
         
@@ -96,8 +93,6 @@ export default function RegisterPage() {
     }
     
     try {
-      console.log('이메일 인증 시도:', { email: formData.email, code: formData.verificationCode });
-      
       // 실제 API 호출로 변경
       await emailService.verifyCode(formData.email, formData.verificationCode);
       
@@ -106,7 +101,6 @@ export default function RegisterPage() {
       setCurrentStep(RegisterStep.USER_INFO);
       setMessage('이메일 인증이 완료되었습니다. 회원 정보를 입력해주세요.');
     } catch (err) {
-      console.error('이메일 인증 오류:', err);
       if (err instanceof Error) {
         // 인증 코드 관련 오류 메시지 처리
         const errorMessage = err.message.toLowerCase();
@@ -158,8 +152,6 @@ export default function RegisterPage() {
     }
     
     try {
-      console.log('회원가입 시도:', { username: formData.username, email: formData.email });
-      
       // 실제 API 호출로 변경 (자동 로그인 포함)
       await register(formData.email, formData.password, formData.username);
       
@@ -171,7 +163,6 @@ export default function RegisterPage() {
         router.push('/');
       }, 2000);
     } catch (err) {
-      console.error('회원가입 오류:', err);
       if (err instanceof Error) {
         setError(`오류: ${err.message}`);
       } else {

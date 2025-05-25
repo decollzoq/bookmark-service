@@ -35,7 +35,7 @@ public class AuthService {
 
         refreshTokenRepository.save(new RefreshToken(user.getId(), refreshToken));
 
-        return new LoginResponseDto(accessToken, refreshToken);
+        return new LoginResponseDto(accessToken, refreshToken, user);
     }
 
     public LoginResponseDto reissue(String refreshToken) {
@@ -48,6 +48,8 @@ public class AuthService {
         }
 
         String newAccessToken = jwtTokenProvider.generateToken(userId);
-        return new LoginResponseDto(newAccessToken, refreshToken);
+        
+        User user = userRepository.findById(userId).orElse(null);
+        return new LoginResponseDto(newAccessToken, refreshToken, user);
     }
 }

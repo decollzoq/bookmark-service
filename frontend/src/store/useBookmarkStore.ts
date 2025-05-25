@@ -15,7 +15,6 @@ const getIdFromToken = (token: string): string | null => {
     const decoded = jwtDecode(token) as any;
     return decoded.sub || null;
   } catch (e) {
-    console.error('토큰에서 ID 추출 실패:', e);
     return null;
   }
 };
@@ -46,15 +45,17 @@ const extractUserFromToken = (token: string, userEmail?: string): User | null =>
     const decoded = jwtDecode(token) as any;
     // 사용자 이메일은 입력된 이메일이나 localStorage에 저장된 이메일을 우선 사용
     const email = userEmail || safeLocalStorage.getItem('userEmail') || decoded.email || decoded.sub || '';
-    const username = email.split('@')[0]; // 이메일의 @ 앞부분만 사용자 이름으로 사용
+    
+    // 닉네임 필드를 직접 사용 (MongoDB에 저장된 nickname 필드 참조)
+    // 백엔드에서 토큰에 nickname 정보를 포함시켜야 함
+    const nickname = decoded.nickname || decoded.username;
     
     return {
       id: decoded.sub || ('user-' + Date.now()),
-      username: username,
+      username: nickname || email, // 닉네임이 없는 경우에만 이메일을 대체값으로 사용
       email: email
     };
   } catch (e) {
-    console.error('토큰 디코딩 실패:', e);
     return null;
   }
 };
@@ -188,20 +189,12 @@ export const useBookmarkStore = create<BookmarkState>()(
       loadUserBookmarks: async (): Promise<Bookmark[]> => {
         try {
           const currentUser = get().currentUser;
-          console.log('loadUserBookmarks 호출됨, 현재 사용자:', currentUser);
-          
           if (!currentUser) {
-            console.log('사용자가 로그인되어 있지 않아 북마크를 로드할 수 없습니다.');
             return [];
           }
-          
-          console.log('북마크 API 호출 시도...');
           const response = await bookmarkService.getAllBookmarks();
-          console.log('북마크 API 응답 받음:', response);
-          
           // 응답이 없거나 배열이 아닌 경우 빈 배열 반환
           if (!response || !Array.isArray(response)) {
-            console.error('백엔드에서 유효하지 않은 응답:', response);
             return [];
           }
           
@@ -209,8 +202,6 @@ export const useBookmarkStore = create<BookmarkState>()(
           const bookmarks: Bookmark[] = response.map(item => {
             // 태그 데이터 처리 (tags 또는 tagNames 필드 모두 처리)
             const tagData = item.tags || item.tagNames || [];
-            console.log('북마크 태그 데이터:', item.id, tagData);
-            
             return {
               id: item.id,
               title: item.title,
@@ -229,7 +220,6 @@ export const useBookmarkStore = create<BookmarkState>()(
           set({ bookmarks });
           return bookmarks;
         } catch (error) {
-          console.error('북마크 로드 실패:', error);
           return [];
         }
       },
@@ -244,7 +234,6 @@ export const useBookmarkStore = create<BookmarkState>()(
           
           // 응답이 없거나 배열이 아닌 경우 빈 배열 반환
           if (!response || !Array.isArray(response)) {
-            console.error('백엔드에서 유효하지 않은 카테고리 응답:', response);
             return [];
           }
           
@@ -252,8 +241,6 @@ export const useBookmarkStore = create<BookmarkState>()(
           const categories: Category[] = response.map(item => {
             // 태그 데이터 처리 (tags 또는 tagNames 필드 모두 처리)
             const tagData = item.tags || item.tagNames || [];
-            console.log('카테고리 태그 데이터:', item.id, tagData);
-            
             // 태그 데이터 변환 (문자열 또는 객체 형식 모두 처리)
             const tagList = tagData.map((tagItem: any) => {
               // 문자열인 경우 (태그 이름만 있는 경우)
@@ -286,7 +273,6 @@ export const useBookmarkStore = create<BookmarkState>()(
           set({ categories });
           return categories;
         } catch (error) {
-          console.error('카테고리 로드 실패:', error);
           return [];
         }
       },
@@ -299,39 +285,14 @@ export const useBookmarkStore = create<BookmarkState>()(
       },
       
       // 특정 카테고리와 관련된 북마크 가져오기 (카테고리 ID 또는 태그 기반)
-      getCategoryBookmarks: (categoryId) => {
-        const { bookmarks, categories, currentUser } = get();
+      getCategoryBookmarks: (categoryId: string): Bookmark[] => {
+        const { bookmarks, categories } = get();
         
         // 카테고리 찾기
         const category = categories.find(c => c.id === categoryId);
         if (!category) {
-          console.log('카테고리를 찾을 수 없음:', categoryId);
           return [];
         }
-        
-        // 디버깅 로그
-        console.log('=== getCategoryBookmarks ===');
-        console.log('카테고리:', category.title);
-        console.log('카테고리 ID:', category.id);
-        
-                  // 카테고리의 태그 정보 자세히 로깅
-          if (category.tagList && category.tagList.length > 0) {
-            console.log('카테고리 태그 수:', category.tagList.length);
-            console.log('카테고리 태그 상세:', category.tagList.map(tag => {
-              // 태그가 문자열인 경우 처리
-              if (typeof tag === 'string') {
-                return { id: '없음', name: tag, type: 'string' };
-              }
-              // 태그가 객체인 경우
-              return {
-                id: tag.id || '없음',
-                name: tag.name || '없음',
-                type: typeof tag
-              };
-            }));
-          } else {
-            console.log('카테고리에 태그가 없음');
-          }
         
         // 1. 먼저 직접 카테고리 ID로 연결된 북마크 찾기
         const directBookmarks = bookmarks.filter(bookmark => 
@@ -343,37 +304,10 @@ export const useBookmarkStore = create<BookmarkState>()(
         
         // 태그 기반 매칭은 카테고리에 태그가 있는 경우에만 수행
         if (category.tagList && category.tagList.length > 0) {
-          // 카테고리 태그의 ID와 이름 집합 생성 (이중 매칭을 위해)
-          const categoryTagIds = new Set(
-            category.tagList
-              .filter(tag => {
-                // 태그가 객체이고 id 필드가 있는 경우만 포함
-                return tag && typeof tag === 'object' && 'id' in tag && tag.id;
-              })
-              .map(tag => (tag as Tag).id)
-          );
+          // 카테고리 태그 ID 집합 생성
+          const categoryTagIds = new Set(category.tagList.map(tag => tag.id));
           
-          const categoryTagNames = new Set(
-            category.tagList
-              .filter(tag => {
-                // 태그가 문자열이면 그대로 사용
-                if (typeof tag === 'string') return true;
-                // 태그가 객체이고 name 필드가 있는 경우 포함
-                return tag && typeof tag === 'object' && 'name' in tag && tag.name;
-              })
-              .map(tag => {
-                // 태그가 문자열이면 그대로 반환
-                if (typeof tag === 'string') return tag.toLowerCase();
-                // 태그가 객체이면 name 필드 반환
-                return (tag as Tag).name.toLowerCase();
-              })
-          );
-          
-          // 강제 문자열 변환을 통해 로그 출력 (타입 오류 방지)
-          console.log('카테고리 태그 ID 집합:', JSON.stringify([...categoryTagIds]));
-          console.log('카테고리 태그 이름 집합:', JSON.stringify([...categoryTagNames]));
-          
-          // 북마크 태그 매칭 로직
+          // 태그 ID가 일치하는 북마크 필터링
           tagMatchedBookmarks = bookmarks.filter(bookmark => {
             // 이미 직접 연결된 북마크는 제외
             if (bookmark.categoryId === categoryId) return false;
@@ -381,61 +315,13 @@ export const useBookmarkStore = create<BookmarkState>()(
             // 북마크에 태그가 없는 경우 매칭되지 않음
             if (!bookmark.tagList || bookmark.tagList.length === 0) return false;
             
-            // 북마크 태그 정보 로깅 (디버깅 용)
-            if (bookmark.id.includes('debug')) {
-              console.log('북마크 태그 검사:', bookmark.title, bookmark.tagList);
-            }
-            
-                          // 태그 매칭 (ID 또는 이름으로 매칭)
-              for (const bookmarkTag of bookmark.tagList) {
-                if (!bookmarkTag) continue;
-                
-                // 태그가 문자열인 경우
-                if (typeof bookmarkTag === 'string') {
-                  if (categoryTagNames.has(bookmarkTag.toLowerCase())) {
-                    console.log(`태그 이름 매칭 (문자열): 북마크 "${bookmark.title}"(${bookmark.id})의 태그 "${bookmarkTag}"`);
-                    return true;
-                  }
-                  continue;
-                }
-                
-                // 태그가 객체인 경우
-                
-                // ID로 매칭
-                if (bookmarkTag.id && categoryTagIds.has(bookmarkTag.id)) {
-                  console.log(`태그 ID 매칭: 북마크 "${bookmark.title}"(${bookmark.id})의 태그 ID "${bookmarkTag.id}"`);
-                  return true;
-                }
-                
-                // 이름으로 매칭 (대소문자 구분 없이)
-                if (bookmarkTag.name && categoryTagNames.has(bookmarkTag.name.toLowerCase())) {
-                  console.log(`태그 이름 매칭: 북마크 "${bookmark.title}"(${bookmark.id})의 태그 "${bookmarkTag.name}"`);
-                  return true;
-                }
-              }
-            
-            return false;
+            // 북마크의 태그 ID 중 하나라도 카테고리 태그 ID와 일치하는지 확인
+            return bookmark.tagList.some(tag => categoryTagIds.has(tag.id));
           });
-        
-          console.log(`태그 매칭된 북마크 수: ${tagMatchedBookmarks.length}`);
-          if (tagMatchedBookmarks.length > 0) {
-            console.log('태그 매칭된 북마크:', tagMatchedBookmarks.map(b => b.title));
-          }
-        } else {
-          console.log('카테고리에 태그가 없음, 태그 매칭 건너뜀');
-        }
-        
-        console.log('직접 연결된 북마크 수:', directBookmarks.length);
-        if (directBookmarks.length > 0) {
-          console.log('직접 연결된 북마크:', directBookmarks.map(b => b.title));
         }
         
         // 3. 두 결과 합치기
-        const result = [...directBookmarks, ...tagMatchedBookmarks];
-        console.log(`총 반환 북마크 수: ${result.length}`);
-        console.log('=== getCategoryBookmarks 종료 ===');
-        
-        return result;
+        return [...directBookmarks, ...tagMatchedBookmarks];
       },
       
       // 사용자별 카테고리 조회 함수
@@ -483,9 +369,6 @@ export const useBookmarkStore = create<BookmarkState>()(
         try {
           // 1. 태그 정보를 태그 이름 배열로 변환
           const tagNames = bookmarkData.tagList?.map(tag => tag.name) || [];
-          
-          console.log('태그 이름 배열:', tagNames);
-          
           // 2. 백엔드 API 호출
           return bookmarkService.createBookmark({
             title: bookmarkData.title,
@@ -494,8 +377,6 @@ export const useBookmarkStore = create<BookmarkState>()(
             categoryId: bookmarkData.categoryId || null, // null로 명시적 처리
             tagNames: tagNames // tags -> tagNames로 필드명 변경
           }).then(response => {
-            console.log('북마크 생성 응답:', response);
-            
             // 태그 데이터 처리 (tags 또는 tagNames 필드 모두 처리)
             const tagData = response.tags || response.tagNames || [];
             
@@ -517,9 +398,6 @@ export const useBookmarkStore = create<BookmarkState>()(
           userId: userId,
               integrated: bookmarkData.integrated || false
         };
-        
-            console.log('생성된 북마크 객체:', newBookmark);
-            
             // 4. 상태 업데이트
         set((state) => ({ 
           bookmarks: [...state.bookmarks, newBookmark],
@@ -536,7 +414,6 @@ export const useBookmarkStore = create<BookmarkState>()(
         return newBookmark;
           });
         } catch (error) {
-          console.error('북마크 생성 실패:', error);
           throw error;
         }
       },
@@ -547,17 +424,12 @@ export const useBookmarkStore = create<BookmarkState>()(
         // 북마크 소유자 검증
         const bookmark = bookmarks.find(b => b.id === id);
         if (!bookmark || (currentUser && bookmark.userId !== currentUser.id)) {
-          console.error('해당 북마크를 수정할 권한이 없습니다.');
           return;
         }
         
         try {
           // 1. 태그 리스트를 태그 이름 배열로 변환
           const tagNames = bookmarkData.tagList?.map(tag => tag.name);
-          
-          console.log('수정할 북마크 ID:', id);
-          console.log('수정할 태그 이름 배열:', tagNames);
-          
           // 2. 백엔드 API 호출
           const updateData: any = {};
           if (bookmarkData.title) updateData.title = bookmarkData.title;
@@ -565,13 +437,7 @@ export const useBookmarkStore = create<BookmarkState>()(
           if (bookmarkData.description !== undefined) updateData.description = bookmarkData.description;
           if (bookmarkData.categoryId !== undefined) updateData.categoryId = bookmarkData.categoryId;
           if (tagNames) updateData.tagNames = tagNames; // tags -> tagNames로 필드명 변경
-          
-          console.log('업데이트 데이터:', updateData);
-          
           const response = await bookmarkService.updateBookmark(id, updateData);
-          
-          console.log('북마크 업데이트 응답:', response);
-          
           // 태그 데이터 처리 (tags 또는 tagNames 필드 모두 처리)
           const tagData = response.tags || response.tagNames || [];
           
@@ -596,7 +462,6 @@ export const useBookmarkStore = create<BookmarkState>()(
             };
           });
         } catch (error) {
-          console.error('북마크 업데이트 실패:', error);
           throw error;
         }
       },
@@ -607,7 +472,6 @@ export const useBookmarkStore = create<BookmarkState>()(
         // 북마크 소유자 검증
         const bookmark = bookmarks.find(b => b.id === id);
         if (!bookmark || (currentUser && bookmark.userId !== currentUser.id)) {
-          console.error('해당 북마크를 삭제할 권한이 없습니다.');
           return;
         }
         
@@ -621,7 +485,6 @@ export const useBookmarkStore = create<BookmarkState>()(
           recentViews: state.recentViews.filter(rv => rv.bookmarkId !== id)
         }));
         } catch (error) {
-          console.error('북마크 삭제 실패:', error);
           throw error;
         }
       },
@@ -632,7 +495,6 @@ export const useBookmarkStore = create<BookmarkState>()(
         // 북마크 소유자 검증
         const bookmark = bookmarks.find(b => b.id === id);
         if (!bookmark || (currentUser && bookmark.userId !== currentUser.id)) {
-          console.error('해당 북마크를 즐겨찾기 할 권한이 없습니다.');
           return;
         }
         
@@ -647,7 +509,6 @@ export const useBookmarkStore = create<BookmarkState>()(
           )
         }));
         } catch (error) {
-          console.error('즐겨찾기 토글 실패:', error);
           throw error;
         }
       },
@@ -675,30 +536,21 @@ export const useBookmarkStore = create<BookmarkState>()(
       },
       
       addCategory: async (categoryData) => {
-        console.log("addCategory 함수 호출됨:", categoryData);
         const currentUser = get().currentUser;
         
         if (!currentUser) {
-          console.error("addCategory 실패: 로그인되지 않음");
           return null;
         }
         
         try {
-        console.log("카테고리 추가 중, 현재 사용자:", currentUser);
-          
           // 1. 태그 정보를 태그 이름 배열로 변환
           const tagNames = categoryData.tagList?.map(tag => tag.name) || [];
-          console.log('태그 이름 배열:', tagNames);
-          
           // 2. 백엔드 API 호출
           const response = await categoryService.createCategory({
             title: categoryData.title,
             isPublic: categoryData.isPublic || false,
             tagNames: tagNames // tags -> tagNames로 필드명 변경
           });
-          
-          console.log("백엔드 응답:", response);
-          
           // 태그 데이터 처리 (tags 또는 tagNames 필드 모두 처리)
           let tagData: any[] = [];
           
@@ -736,20 +588,14 @@ export const useBookmarkStore = create<BookmarkState>()(
             updatedAt: response.updatedAt,
           userId: currentUser.id
         };
-        
-          console.log("생성된 카테고리:", newCategory);
-        
           // 4. 상태 업데이트
         set((state) => {
           const updatedCategories = [...state.categories, newCategory];
-          console.log("업데이트된 카테고리 목록 (개수):", updatedCategories.length);
           return { categories: updatedCategories };
         });
         
           return newCategory.id;
         } catch (error) {
-          console.error("백엔드 카테고리 생성 실패:", error);
-          
           // 오류 발생 시 로컬에만 저장 (오프라인 지원)
           const newCategory: Category = {
             id: uuidv4(),
@@ -772,46 +618,33 @@ export const useBookmarkStore = create<BookmarkState>()(
         // 카테고리 소유자 검증
         const category = categories.find(c => c.id === id);
         if (!currentUser || !category || category.userId !== currentUser.id) {
-          console.error('해당 카테고리를 수정할 권한이 없습니다.');
           return;
         }
         
         try {
-          console.log('카테고리 업데이트 시작:', { id, categoryData });
-          
           // 1. 태그 정보를 태그 이름 배열로 변환 (태그 필드가 있는 경우)
           const updateData: any = { ...categoryData };
           if (categoryData.tagList) {
             updateData.tagNames = categoryData.tagList.map(tag => tag.name); // tags -> tagNames로 필드명 변경
-            console.log('수정할 태그 이름 배열:', updateData.tagNames);
             delete updateData.tagList; // API 호출 시 tagList 필드 제거
           }
           
           // 2. 백엔드 API 호출
-          console.log('백엔드 API 호출 전 데이터:', updateData);
           const response = await categoryService.updateCategory(id, updateData);
-          console.log("백엔드 응답:", response);
-          
           // 태그 데이터 처리 (tags 또는 tagNames 필드 모두 처리)
           let tagData: any[] = [];
           
           // 응답에서 태그 데이터 추출
           if (Array.isArray(response.tags)) {
-            console.log('백엔드 응답에서 tags 필드 발견');
             tagData = response.tags;
           } else if (Array.isArray(response.tagNames)) {
-            console.log('백엔드 응답에서 tagNames 필드 발견');
             tagData = response.tagNames;
           } else {
-            console.log('백엔드 응답에 태그 데이터 없음, 원본 태그 사용');
             // 원본 tagList에서 태그 데이터 사용
             if (categoryData.tagList) {
               tagData = categoryData.tagList;
             }
           }
-          
-          console.log('태그 데이터 처리 결과:', tagData);
-          
           // 3. 상태 업데이트 - 응답에서 태그 정보 사용
           set((state) => {
             // 새로 생성할 태그 리스트
@@ -831,9 +664,6 @@ export const useBookmarkStore = create<BookmarkState>()(
                 userId: currentUser.id
               };
             });
-            
-            console.log('최종 업데이트할 태그 리스트:', updatedTagList);
-            
             return {
               categories: state.categories.map(category => 
                 category.id === id ? { 
@@ -845,11 +675,7 @@ export const useBookmarkStore = create<BookmarkState>()(
               )
             };
           });
-          
-          console.log('카테고리 업데이트 완료');
         } catch (error) {
-          console.error('카테고리 업데이트 실패:', error);
-          
           // 오류 발생해도 UI 업데이트 (낙관적 업데이트)
         set((state) => ({
           categories: state.categories.map(category => 
@@ -865,7 +691,6 @@ export const useBookmarkStore = create<BookmarkState>()(
         // 카테고리 소유자 검증
         const category = categories.find(c => c.id === id);
         if (!category || (currentUser && category.userId !== currentUser.id)) {
-          console.error('해당 카테고리를 삭제할 권한이 없습니다.');
           return;
         }
         
@@ -878,8 +703,6 @@ export const useBookmarkStore = create<BookmarkState>()(
           categories: state.categories.filter(category => category.id !== id)
         }));
         } catch (error) {
-          console.error('카테고리 삭제 실패:', error);
-          
           // 오류 발생해도 UI에서는 삭제 (낙관적 업데이트)
           set((state) => ({
             categories: state.categories.filter(category => category.id !== id)
@@ -889,21 +712,13 @@ export const useBookmarkStore = create<BookmarkState>()(
       
       // 카테고리 복사 함수
       copyCategory: async (categoryId, options = {}) => {
-        console.log("copyCategory 함수 호출됨, categoryId:", categoryId);
         const { currentUser, categories } = get();
         
         if (!currentUser) {
-          console.error("copyCategory 실패: 로그인되지 않음");
           return null;
         }
-        
-        console.log("카테고리 복사 중, 현재 사용자:", currentUser);
-        
         const originalCategory = categories.find(c => c.id === categoryId);
-        console.log("복사할 원본 카테고리:", originalCategory);
-        
         if (!originalCategory) {
-          console.error("copyCategory 실패: 원본 카테고리를 찾을 수 없음");
           return null;
         }
         
@@ -930,11 +745,20 @@ export const useBookmarkStore = create<BookmarkState>()(
           const tagData = response.tags || response.tagNames || [];
           
           // 4. 응답 데이터로 Category 객체 생성
-          const tagList = tagData.map(tag => ({
-            id: tag.id,
-            name: tag.name,
-            userId: currentUser.id
-          }));
+          const tagList = tagData.map((tag: ApiTag | string) => {
+            if (typeof tag === 'string') {
+              return {
+                id: `tag-${Math.random()}`,
+                name: tag,
+                userId: currentUser.id
+              };
+            }
+            return {
+              id: tag.id,
+              name: tag.name,
+              userId: currentUser.id
+            };
+          });
         
         const categoryCopy: Category = {
             id: newCategoryId,
@@ -945,20 +769,14 @@ export const useBookmarkStore = create<BookmarkState>()(
             updatedAt: response.updatedAt,
             userId: currentUser.id
           };
-          
-          console.log("생성된 카테고리:", categoryCopy);
-          
           // 5. 상태 업데이트
           set((state) => {
             const updatedCategories = [...state.categories, categoryCopy];
-            console.log("업데이트된 카테고리 목록 (개수):", updatedCategories.length);
             return { categories: updatedCategories };
           });
           
           return newCategoryId;
         } catch (error) {
-          console.error("백엔드 카테고리 복사 생성 실패:", error);
-          
           // 오류 발생 시 로컬에만 저장 (오프라인 지원)
           const newCategoryId = uuidv4();
           
@@ -975,7 +793,6 @@ export const useBookmarkStore = create<BookmarkState>()(
         // 상태 업데이트
         set((state) => {
           const updatedCategories = [...state.categories, categoryCopy];
-            console.log("업데이트된 카테고리 목록 (로컬 전용):", updatedCategories.length);
           return { categories: updatedCategories };
         });
         
@@ -986,44 +803,29 @@ export const useBookmarkStore = create<BookmarkState>()(
       addTag: async (name) => {
         const currentUser = get().currentUser;
         const userId = currentUser?.id || 'anonymous';
-        
-        console.log('태그 생성 시도:', name);
-        
         try {
           // 1. 백엔드 API 호출
           const response = await tagService.createTag({ name });
-          
-          console.log('태그 생성 응답:', response);
-          
           // 2. 응답 데이터로 Tag 객체 생성
         const newTag = { 
             id: response.id || uuidv4(), 
             name: response.name || name,
             userId 
           };
-          
-          console.log('생성된 태그 객체:', newTag);
-          
           // 3. 상태 업데이트
           set((state) => {
             const updatedTags = [...state.tags, newTag];
-            console.log('업데이트된 태그 목록:', updatedTags.length);
             return { tags: updatedTags };
           });
           
           return newTag;
         } catch (error) {
-          console.error('태그 생성 실패:', error);
-          
           // 오류 발생 시 로컬에만 저장 (오프라인 지원)
           const fallbackTag = {
           id: uuidv4(), 
           name,
           userId 
         };
-          
-          console.log('생성된 로컬 태그 객체:', fallbackTag);
-        
         set((state) => ({
             tags: [...state.tags, fallbackTag]
         }));
@@ -1037,7 +839,6 @@ export const useBookmarkStore = create<BookmarkState>()(
         const currentUser = state.currentUser;
         
         if (!currentUser) {
-          console.error('태그를 추가하려면 로그인이 필요합니다.');
           return { id: 'temp', name, userId: 'anonymous' };
         }
         
@@ -1073,8 +874,6 @@ export const useBookmarkStore = create<BookmarkState>()(
         }))
           }));
         } catch (error) {
-          console.error('태그 삭제 실패:', error);
-          
           // 오류가 발생해도 UI에서는 삭제 (낙관적 업데이트)
           set((state) => ({
             tags: state.tags.filter(tag => tag.id !== id),
@@ -1091,14 +890,12 @@ export const useBookmarkStore = create<BookmarkState>()(
       },
       
       createShareLink: ({ bookmarkId, categoryId }) => {
-        console.log("공유 링크 생성 요청:", { bookmarkId, categoryId });
         const state = get();
         
         // ID 유효성 검사
         if (bookmarkId) {
           const bookmarkExists = state.bookmarks.some(b => b.id === bookmarkId);
           if (!bookmarkExists) {
-            console.error("존재하지 않는 북마크 ID:", bookmarkId);
             throw new Error("존재하지 않는 북마크입니다.");
           }
         }
@@ -1106,7 +903,6 @@ export const useBookmarkStore = create<BookmarkState>()(
         if (categoryId) {
           const category = state.categories.find(c => c.id === categoryId);
           if (!category) {
-            console.error("존재하지 않는 카테고리 ID:", categoryId);
             throw new Error("존재하지 않는 카테고리입니다.");
           }
           
@@ -1123,16 +919,10 @@ export const useBookmarkStore = create<BookmarkState>()(
           categoryId: categoryId || null,
           createdAt: new Date().toISOString()
         };
-        
-        console.log("생성된 공유 링크:", newShareLink);
-        
         // 기존 공유 링크 확인
-        console.log("기존 공유 링크 목록:", get().sharedLinks);
-        
         // 공유 링크 추가
         set((state) => {
           const newLinks = [...state.sharedLinks, newShareLink];
-          console.log("업데이트된 공유 링크 목록:", newLinks);
           return { sharedLinks: newLinks };
         });
         
@@ -1140,37 +930,26 @@ export const useBookmarkStore = create<BookmarkState>()(
       },
       
       getShareLinkByUuid: (uuid) => {
-        console.log("getShareLinkByUuid 호출됨, uuid:", uuid);
-        console.log("현재 sharedLinks:", get().sharedLinks);
-        
         if (!uuid || !get().sharedLinks) {
-          console.log("UUID가 없거나 sharedLinks가 없음");
           return null;
         }
         
         const link = get().sharedLinks.find(link => link.uuid === uuid);
-        console.log("찾은 링크:", link);
-        
         if (!link) {
-          console.log("링크를 찾을 수 없음");
           return null;
         }
         
         // 북마크 공유인 경우
         if (link.bookmarkId) {
           const bookmark = get().bookmarks.find(b => b.id === link.bookmarkId);
-          console.log("찾은 공유 북마크:", bookmark);
           return { link, bookmarkData: bookmark };
         }
         
         // 카테고리 공유인 경우
         if (link.categoryId) {
           const category = get().categories.find(c => c.id === link.categoryId);
-          console.log("찾은 공유 카테고리:", category);
-          
           if (category) {
             const categoryBookmarks = get().getCategoryBookmarks(category.id);
-            console.log("카테고리 관련 북마크 수:", categoryBookmarks.length);
           }
           
           return { link, categoryData: category };
@@ -1181,26 +960,15 @@ export const useBookmarkStore = create<BookmarkState>()(
       
       // 카테고리에 북마크를 추가하는 함수 (가져오기 기능)
       importCategoryWithBookmarks: async (categoryId: string) => {
-        console.log("카테고리 가져오기 함수 호출됨, categoryId:", categoryId);
         const state = get();
-        console.log("현재 사용자:", state.currentUser);
-        
         const category = state.categories.find(c => c.id === categoryId);
-        console.log("찾은 카테고리:", category);
-        
         if (!category) {
-          console.error("카테고리를 찾을 수 없음:", categoryId);
-          console.log("현재 카테고리 목록:", state.categories.map(c => ({ id: c.id, title: c.title })));
           return null;
         }
         
         // 새 카테고리 생성 - withNewTitle: false로 설정하여 (복사본) 접미사 제거
-        console.log("카테고리 복사 시도:", category.title);
         const newCategoryId = await state.copyCategory(categoryId, { withNewTitle: false });
-        console.log("복사된 카테고리 ID:", newCategoryId);
-        
         if (!newCategoryId) {
-          console.error("카테고리 복사 실패");
           return null;
         }
         
@@ -1208,52 +976,38 @@ export const useBookmarkStore = create<BookmarkState>()(
         const newCategory = state.categories.find(c => c.id === newCategoryId);
         
         if (!newCategory) {
-          console.error("복사된 카테고리를 찾을 수 없음");
           return null;
         }
-        
-        console.log("생성된 새 카테고리 객체:", newCategory);
-        
         // 카테고리 태그와 일치하는 북마크 찾기
         if (category.tagList && category.tagList.length > 0) {
-          console.log("카테고리 태그:", category.tagList);
+          // 카테고리 태그 ID 집합 생성
+          const categoryTagIds = new Set(category.tagList.map(tag => tag.id));
           
+          // 북마크 태그 중 하나라도 카테고리 태그 ID와 일치하는 북마크 필터링
           const matchedBookmarks = state.bookmarks.filter(bookmark => 
-            bookmark.tagList.some(bookmarkTag => 
-              category.tagList.some(categoryTag => categoryTag.id === bookmarkTag.id)
-            )
+            bookmark.tagList && bookmark.tagList.some(tag => categoryTagIds.has(tag.id))
           );
-          
-          console.log('매치된 북마크:', matchedBookmarks.length, matchedBookmarks);
-          
           // 북마크 복사하여 추가 (비동기 처리)
           const copyPromises = matchedBookmarks.map(async bookmark => {
-            console.log("북마크 복사 시도:", bookmark.title);
             try {
               // 비동기 함수이므로 await 처리
               const newBookmark = await state.copyBookmark(bookmark.id);
             
             if (newBookmark) {
-              console.log("복사된 북마크:", newBookmark.title);
               // 복사된 북마크를 새 카테고리에 연결
                 await state.updateBookmark(newBookmark.id, {
                 categoryId: newCategory.id
               });
             } else {
-              console.error("북마크 복사 실패:", bookmark.id);
               }
             } catch (error) {
-              console.error("북마크 복사 중 오류:", error);
             }
           });
           
           // 모든 북마크 복사 완료 대기
           await Promise.all(copyPromises);
         } else {
-          console.log("카테고리에 태그가 없음, 북마크 매칭 건너뜀");
         }
-        
-        console.log("카테고리 가져오기 완료, 반환값:", newCategory);
         return newCategory;
       },
       
@@ -1284,15 +1038,11 @@ export const useBookmarkStore = create<BookmarkState>()(
       
       login: async (email, password) => {
         try {
-          console.log('로그인 시도:', { email });
-          
           // 실제 API 호출 (authClient 사용)
-          console.log('인증 API 호출 시도...');
           const response = await apiClient.post('/auth/login', {
             email,
             password
           });
-          console.log('인증 API 응답 받음:', response.data);
           
           // 토큰 저장
           const { accessToken, refreshToken, user } = response.data;
@@ -1304,48 +1054,44 @@ export const useBookmarkStore = create<BookmarkState>()(
           
           // 백엔드에서 받은 사용자 정보 사용
           if (user) {
-            // 기존 user 객체에 이메일 정보 추가
+            // 백엔드에서 받은 user 객체에서 nickname 필드를 username으로 매핑
             const userWithEmail = {
               ...user,
+              username: user.nickname,  // 백엔드의 nickname을 username으로 사용
               email: email  // 입력된 이메일 사용
             };
             set({ currentUser: userWithEmail });
-            console.log('로그인 성공 (이메일 추가):', userWithEmail);
             return userWithEmail;
           } else {
-            // 토큰에서 ID만 추출하고 사용자 객체 직접 생성
+            // 토큰에서 사용자 정보 추출
+            const decoded = jwtDecode(accessToken) as any;
             const userId = getIdFromToken(accessToken);
-            const username = email.split('@')[0]; // 이메일의 @ 앞부분만 사용자 이름으로 사용
+            
+            // 닉네임 필드를 직접 사용 (MongoDB에 저장된 nickname 필드 참조)
+            const nickname = decoded.nickname;
             
             const userInfo = {
               id: userId || ('user-' + Date.now()),
-              username: username,
+              username: nickname || email, // 닉네임이 없는 경우에만 이메일을 대체값으로 사용
               email: email
             };
             
             set({ currentUser: userInfo });
-            console.log('로그인 성공 (사용자 생성):', userInfo);
             return userInfo;
           }
         } catch (error) {
-          console.error('로그인 오류:', error);
           throw error;
         }
       },
       
       register: async (email, password, username) => {
         try {
-          console.log('회원가입 시도:', { email, username });
-          
           // 회원가입 API 호출
           const registerResponse = await apiClient.post('/users/register', {
             email,
             password,
             nickname: username
           });
-          
-          console.log('회원가입 완료. 자동 로그인 시도:', email);
-          
           // 이메일 정보 저장 (회원가입 시 입력한 이메일 사용)
           safeLocalStorage.setItem('userEmail', email);
           
@@ -1363,34 +1109,33 @@ export const useBookmarkStore = create<BookmarkState>()(
             
             // 백엔드에서 받은 사용자 정보 사용
             if (user) {
-              // 기존 user 객체에 이메일 정보 추가
+              // 백엔드에서 받은 user 객체에서 nickname 필드를 username으로 매핑
               const userWithEmail = {
                 ...user,
+                username: user.nickname, // 백엔드의 nickname을 username으로 사용
                 email: email  // 입력된 이메일 사용
               };
               set({ currentUser: userWithEmail });
-              console.log('자동 로그인 성공 (이메일 추가):', userWithEmail);
             } else {
-              // 토큰에서 사용자 정보 추출하는 대신 직접 사용자 객체 생성
+              // 토큰에서 사용자 정보 추출
+              const decoded = jwtDecode(accessToken) as any;
               const userId = getIdFromToken(accessToken);
-              const defaultUsername = username || email.split('@')[0];
+              
+              // 회원가입 시 설정한 닉네임 사용
               const userInfo = {
                 id: userId || ('user-' + Date.now()),
-                username: defaultUsername,
+                username: username, // 회원가입 시 입력한 username 값(nickname)을 그대로 사용
                 email: email
               };
               
               set({ currentUser: userInfo });
-              console.log('자동 로그인 성공 (사용자 생성):', userInfo);
             }
           } catch (loginError) {
-            console.error('자동 로그인 실패:', loginError);
             // 자동 로그인 실패해도 회원가입은 성공했으므로 원래 결과 반환
           }
           
           return registerResponse.data;
         } catch (error) {
-          console.error('회원가입 오류:', error);
           throw error;
         }
       },
@@ -1403,7 +1148,6 @@ export const useBookmarkStore = create<BookmarkState>()(
           safeLocalStorage.removeItem('userEmail');
           set({ currentUser: null });
         } catch (error) {
-          console.error('로그아웃 오류:', error);
           // 오류 발생해도 토큰 및 상태 정리
           safeLocalStorage.removeItem('accessToken');
           safeLocalStorage.removeItem('refreshToken');
@@ -1414,30 +1158,20 @@ export const useBookmarkStore = create<BookmarkState>()(
 
       verifyEmail: async (email, code) => {
         try {
-          console.log('이메일 인증 시도:', { email, code });
-          
           // 실제 API 호출
           const response = await apiClient.post(`/email/verify-code?email=${email}&code=${code}`);
-          
-          console.log('이메일 인증 결과:', response.data);
           return response.data;
         } catch (error) {
-          console.error('이메일 인증 오류:', error);
           throw error;
         }
       },
 
       resendVerification: async (email) => {
         try {
-          console.log('인증 코드 재발송 시도:', { email });
-          
           // 실제 API 호출
           const response = await apiClient.post(`/email/send-code?email=${email}`);
-          
-          console.log('인증 코드 재발송 결과:', response.data);
           return response.data;
         } catch (error) {
-          console.error('인증 코드 재발송 오류:', error);
           throw error;
         }
       },
@@ -1445,15 +1179,10 @@ export const useBookmarkStore = create<BookmarkState>()(
       // 비밀번호 찾기 이메일 발송
       forgotPassword: async (email) => {
         try {
-          console.log('비밀번호 찾기 요청:', { email });
-          
           // 실제 API 구현 시 수정 필요
           const response = await apiClient.post('/forgot-password', { email });
-          
-          console.log('비밀번호 재설정 이메일 발송 결과:', response.data);
           return response.data;
         } catch (error) {
-          console.error('비밀번호 찾기 오류:', error);
           throw error;
         }
       },
@@ -1461,18 +1190,13 @@ export const useBookmarkStore = create<BookmarkState>()(
       // 비밀번호 재설정
       resetPassword: async (token, newPassword) => {
         try {
-          console.log('비밀번호 재설정 요청:', { token: token.slice(0, 10) + '...' });
-          
           // 실제 API 구현 시 수정 필요
           const response = await apiClient.post('/reset-password', { 
             token, 
             newPassword 
           });
-          
-          console.log('비밀번호 재설정 결과:', response.data);
           return response.data;
         } catch (error) {
-          console.error('비밀번호 재설정 오류:', error);
           throw error;
         }
       },
@@ -1485,9 +1209,6 @@ export const useBookmarkStore = create<BookmarkState>()(
           if (!currentUser) {
             throw new Error('로그인 상태가 아닙니다.');
           }
-          
-          console.log('계정 탈퇴 시도:', { userId: currentUser.id });
-          
           // 실제 API 호출
           const response = await apiClient.post('/users/delete-account', { password });
           
@@ -1497,11 +1218,8 @@ export const useBookmarkStore = create<BookmarkState>()(
           
           // 상태 초기화
           set({ currentUser: null });
-          
-          console.log('계정이 성공적으로 삭제되었습니다.');
           return response.data;
         } catch (error) {
-          console.error('계정 탈퇴 오류:', error);
           throw error;
         }
       }
@@ -1519,44 +1237,30 @@ export const useBookmarkStore = create<BookmarkState>()(
               try {
                 // 1. 백엔드에서 북마크 데이터 로드
                 await state.loadUserBookmarks();
-                console.log('백엔드에서 북마크 데이터 로드 완료');
-                
                 // 2. 백엔드에서 카테고리 데이터 로드
                 await state.loadUserCategories();
-                console.log('백엔드에서 카테고리 데이터 로드 완료');
-                
                 // 3. 추가적인 데이터 로드 로직 (나중에 확장 가능)
                 
               } catch (error) {
-                console.error('데이터 로드 실패:', error);
               }
             } else {
-              console.log('로그인되지 않음: 데이터 로드 건너뜀');
-              
               // 로컬 스토리지에 토큰이 있는지 확인
               const token = safeLocalStorage.getItem('accessToken');
               const email = safeLocalStorage.getItem('userEmail');
               
               if (token && email) {
-                console.log('저장된, 토큰 발견, 자동 로그인 시도');
                 try {
                   // 토큰에서 사용자 정보 추출
                   const user = extractUserFromToken(token, email);
                   if (user) {
                     // 사용자 상태 업데이트
                     state.currentUser = user;
-                    console.log('토큰을 사용하여 자동으로 로그인됨:', user);
-                    
                     // 데이터 로드 재시도
                     await state.loadUserBookmarks();
-                    console.log('자동 로그인 후 북마크 데이터 로드 완료');
-                    
                     // 카테고리 데이터도 로드
                     await state.loadUserCategories();
-                    console.log('자동 로그인 후 카테고리 데이터 로드 완료');
                   }
                 } catch (autoLoginError) {
-                  console.error('자동 로그인 실패:', autoLoginError);
                 }
               }
             }

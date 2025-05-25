@@ -51,8 +51,6 @@ export default function ResetPasswordPage({ params }: ResetPasswordPageProps) {
       await resetPassword(token, password);
       setSuccess(true);
     } catch (err) {
-      console.error('비밀번호 재설정 오류:', err);
-      
       if (err instanceof Error) {
         setError(err.message);
       } else {

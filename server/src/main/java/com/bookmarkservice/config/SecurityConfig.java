@@ -33,7 +33,6 @@ public class SecurityConfig {
                         .authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/test",
                                 "/users/**",
                                 "/email/**",
                                 "/auth/**",

@@ -69,10 +69,8 @@ const categoryService = {
   getBookmarksByCategory: async (categoryId: string): Promise<BookmarkResponse[]> => {
     try {
       const response = await apiClient.get<BookmarkResponse[]>(`/api/categories/${categoryId}/bookmarks`);
-      console.log('카테고리 북마크 응답:', response.data);
       return response.data;
     } catch (error) {
-      console.error('카테고리 북마크 조회 실패:', error);
       return [];
     }
   },

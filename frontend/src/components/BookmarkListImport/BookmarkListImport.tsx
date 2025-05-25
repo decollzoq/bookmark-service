@@ -56,7 +56,6 @@ export const BookmarkListImport: React.FC<BookmarkListImportProps> = ({
         alert('카테고리를 가져오는 중 오류가 발생했습니다.');
       }
     } catch (err) {
-      console.error('컬렉션 추가 오류:', err);
       setImportStatus('error');
       alert('내 컬렉션에 추가하는 중 오류가 발생했습니다.');
     }

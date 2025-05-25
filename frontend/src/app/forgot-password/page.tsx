@@ -29,8 +29,6 @@ export default function ForgotPasswordPage() {
       await forgotPassword(email);
       setSuccess(true);
     } catch (err) {
-      console.error('비밀번호 찾기 오류:', err);
-      
       if (err instanceof Error) {
         setError(err.message);
       } else {

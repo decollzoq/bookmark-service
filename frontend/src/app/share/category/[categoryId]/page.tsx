@@ -24,21 +24,14 @@ export default function ShareCategoryPage({ params }: { params: { categoryId: st
   
   React.useEffect(() => {
     if (!isHydrated) {
-      console.log("아직 데이터가 로드되지 않았습니다. 대기 중...");
       return; // 하이드레이션이 완료되지 않았으면 종료
     }
     
     setLoading(true);
-    
-    console.log("카테고리 ID로 직접 공유:", categoryId);
-    console.log("하이드레이션 상태:", isHydrated);
-    console.log("사용 가능한 카테고리 수:", categories.length);
-    
     // 카테고리 ID로 카테고리 찾기
     const foundCategory = categories.find(c => c.id === categoryId);
     
     if (!foundCategory) {
-      console.error("카테고리를 찾을 수 없음:", categoryId);
       if (categories.length === 0) {
         setError('로컬스토리지 데이터가 로드되지 않았거나 비어 있습니다. 카테고리를 먼저 생성해주세요.');
       } else {
@@ -49,7 +42,6 @@ export default function ShareCategoryPage({ params }: { params: { categoryId: st
     }
     
     if (!foundCategory.isPublic) {
-      console.error("비공개 카테고리:", foundCategory);
       setError('이 카테고리는 비공개 상태입니다.');
       setLoading(false);
       return;
@@ -62,19 +54,17 @@ export default function ShareCategoryPage({ params }: { params: { categoryId: st
       console.warn("카테고리에 태그가 없음:", foundCategory);
       setCategoryBookmarks([]);
     } else {
-      // 카테고리 태그와 북마크 태그 매칭
+      // 카테고리 태그 ID 집합 생성
+      const categoryTagIds = new Set(foundCategory.tagList.map(tag => tag.id));
+      
+      // 북마크의 태그 ID 중 하나라도 카테고리 태그 ID와 일치하는지 확인
       const matchedBookmarks = bookmarks.filter(bookmark => {
         if (!bookmark.tagList || bookmark.tagList.length === 0) {
           return false;
         }
         
-        // 태그 ID 기반 매칭
-        return bookmark.tagList.some(bookmarkTag => 
-          foundCategory.tagList.some(categoryTag => categoryTag.id === bookmarkTag.id)
-        );
+        return bookmark.tagList.some(tag => categoryTagIds.has(tag.id));
       });
-      
-      console.log("매칭된 북마크:", matchedBookmarks.length);
       setCategoryBookmarks(matchedBookmarks);
     }
     
