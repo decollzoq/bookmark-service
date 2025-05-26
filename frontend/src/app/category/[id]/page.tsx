@@ -78,7 +78,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   
   // 콘솔에 카테고리 정보와 태그 출력 (디버깅용)
   // 카테고리 공유 링크 생성
-  const handleShareCategory = () => {
+  const handleShareCategory = async () => {
     try {
       // 비공개 카테고리도 공유 가능함을 알림
       if (!category.isPublic) {
@@ -88,7 +88,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
         }
       }
       
-      const shareLink = createShareLink({ categoryId: id });
+      const shareLink = await createShareLink({ categoryId: id });
       const fullShareUrl = `${window.location.origin}/share/${shareLink.uuid}`;
       
       // 클립보드에 복사

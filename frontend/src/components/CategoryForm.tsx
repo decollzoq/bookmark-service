@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useBookmarkStore } from '@/store/useBookmarkStore';
 import { Category, Tag } from '@/types';
 
@@ -15,7 +15,9 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSuccess 
     addTag, 
     addCategory, 
     updateCategory, 
-    currentUser 
+    currentUser,
+    loadUserCategories,
+    loadUserTags 
   } = useBookmarkStore();
   
   // 현재 사용자의 태그만 가져오기
@@ -30,9 +32,6 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSuccess 
     tag?: string;
   }>({});
   
-  // 사용 가능한 태그 목록을 위한 상태 추가
-  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
-  
   // category가 변경될 때 selectedTags 업데이트 (편집 시 필수)
   useEffect(() => {
     if (category?.tagList) {
@@ -40,23 +39,19 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSuccess 
     }
   }, [category]);
   
-  // 컴포넌트 마운트 시 한 번만 사용자 태그 목록 설정
-  useEffect(() => {
-    // 사용 가능한 태그 목록 초기화
-    const filteredTags = userTags.filter(
+  // 사용 가능한 태그 목록을 메모이제이션으로 계산 (무한 루프 방지)
+  const availableTags = useMemo(() => {
+    return userTags.filter(
       tag => !selectedTags.some(selected => selected.id === tag.id)
     );
-    setAvailableTags(filteredTags);
-  }, []);
-  
-  // selectedTags만 의존성 배열에 포함하여 무한 루프 방지
-  useEffect(() => {
-    // 선택된 태그가 변경될 때만 available 태그 다시 계산
-    const filteredTags = userTags.filter(
-      tag => !selectedTags.some(selected => selected.id === tag.id)
-    );
-    setAvailableTags(filteredTags);
-  }, [selectedTags]);
+  }, [
+    userTags.length, 
+    selectedTags.length,
+    // 선택된 태그 ID들의 정렬된 문자열로 변경 감지
+    selectedTags.map(t => t.id).sort().join(','),
+    // 사용자 태그 ID들의 정렬된 문자열로 변경 감지  
+    userTags.map(t => t.id).sort().join(',')
+  ]);
   
   const handleAddTag = async () => {
     if (!newTagName.trim()) return;
@@ -77,21 +72,8 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSuccess 
         return;
       }
       
-      // 태그 추가 전 디버깅
-      console.log('기존 태그 추가 전:', { 
-        existingTag, 
-        selectedTagsIds: selectedTags.map(t => t.id),
-        selectedTagsCount: selectedTags.length
-      });
-      
       const newSelectedTags = [...selectedTags, existingTag];
       setSelectedTags(newSelectedTags);
-      
-      // 태그 추가 후 디버깅
-      console.log('기존 태그 추가 후:', { 
-        selectedTagsIds: newSelectedTags.map(t => t.id),
-        selectedTagsCount: newSelectedTags.length
-      });
       
       setErrors({...errors, tag: undefined});
     } else {
@@ -99,21 +81,11 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSuccess 
         // await로 비동기 함수 처리
         const newTag = await addTag(newTagName);
         
-        // 태그 추가 전 디버깅
-        console.log('새 태그 추가 전:', { 
-          newTag, 
-          selectedTagsIds: selectedTags.map(t => t.id),
-          selectedTagsCount: selectedTags.length
-        });
+        // 태그 추가 후 백엔드에서 최신 태그 데이터 다시 로드
+        await loadUserTags();
         
         const newSelectedTags = [...selectedTags, newTag];
         setSelectedTags(newSelectedTags);
-        
-        // 태그 추가 후 디버깅
-        console.log('새 태그 추가 후:', { 
-          selectedTagsIds: newSelectedTags.map(t => t.id),
-          selectedTagsCount: newSelectedTags.length
-        });
         
         setErrors({...errors, tag: undefined});
       } catch (error) {
@@ -139,31 +111,41 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSuccess 
     return Object.keys(newErrors).length === 0;
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) return;
-    if (category) {
-      // 수정
-      updateCategory(category.id, {
-        title,
-        tagList: selectedTags,
-        isPublic
-      });
-    } else {
-      // 새 카테고리 추가
-      addCategory({
-        title,
-        tagList: selectedTags,
-        isPublic,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      } as any); // 타입 오류 해결을 위해 타입 단언 사용
-    }
     
-    // 성공 콜백
-    if (onSuccess) {
-      onSuccess();
+    try {
+      if (category) {
+        // 수정
+        await updateCategory(category.id, {
+          title,
+          tagList: selectedTags,
+          isPublic
+        });
+        // 카테고리 수정 후 백엔드에서 최신 데이터 다시 로드
+        await loadUserCategories();
+      } else {
+        // 새 카테고리 추가
+        await addCategory({
+          title,
+          tagList: selectedTags,
+          isPublic,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        } as any); // 타입 오류 해결을 위해 타입 단언 사용
+        // 카테고리 추가 후 백엔드에서 최신 데이터 다시 로드
+        await loadUserCategories();
+      }
+      
+      // 성공 콜백
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error) {
+      console.error('카테고리 저장 중 오류:', error);
+      // 오류 처리 (필요시 사용자에게 알림)
     }
   };
   

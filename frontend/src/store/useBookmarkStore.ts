@@ -138,8 +138,8 @@ interface BookmarkState {
   getUserTags: () => Tag[];
   
   // 공유 링크 관련 함수
-  createShareLink: (params: { bookmarkId?: string; categoryId?: string }) => SharedLink;
-  getShareLinkByUuid: (uuid: string) => any;
+  createShareLink: (params: { bookmarkId?: string; categoryId?: string }) => Promise<SharedLink>;
+  getShareLinkByUuid: (uuid: string) => Promise<any>;
   
   // 최근 조회 관련 함수
   addRecentView: (bookmarkId: string) => void;
@@ -172,6 +172,9 @@ interface BookmarkState {
 
   // 백엔드에서 카테고리 데이터 로드
   loadUserCategories: () => Promise<Category[]>;
+
+  // 백엔드에서 태그 데이터 로드
+  loadUserTags: () => Promise<Tag[]>;
 }
 
 export const useBookmarkStore = create<BookmarkState>()(
@@ -301,6 +304,33 @@ export const useBookmarkStore = create<BookmarkState>()(
           
           set({ categories });
           return categories;
+        } catch (error) {
+          return [];
+        }
+      },
+      
+      // 백엔드에서 태그 데이터 로드
+      loadUserTags: async (): Promise<Tag[]> => {
+        try {
+          const currentUser = get().currentUser;
+          if (!currentUser) return [];
+          
+          const response = await tagService.getAllTags();
+          
+          // 응답이 없거나 배열이 아닌 경우 빈 배열 반환
+          if (!response || !Array.isArray(response)) {
+            return [];
+          }
+          
+          // 백엔드에서 받은 데이터를 프론트엔드 형식으로 변환
+          const tags: Tag[] = response.map(item => ({
+            id: item.id,
+            name: item.name,
+            userId: currentUser.id
+          }));
+          
+          set({ tags });
+          return tags;
         } catch (error) {
           return [];
         }
@@ -918,7 +948,7 @@ export const useBookmarkStore = create<BookmarkState>()(
         }
       },
       
-      createShareLink: ({ bookmarkId, categoryId }) => {
+      createShareLink: async ({ bookmarkId, categoryId }) => {
         const state = get();
         
         // ID 유효성 검사
@@ -939,52 +969,123 @@ export const useBookmarkStore = create<BookmarkState>()(
           if (category.tagList.length === 0) {
             console.warn("태그가 없는 카테고리:", category);
           }
+          
+          try {
+            // 백엔드 API를 호출하여 실제 공유 토큰 생성
+            const shareToken = await categoryService.generateShareToken(categoryId);
+            
+            const newShareLink = {
+              id: uuidv4(),
+              uuid: shareToken, // 백엔드에서 받은 토큰 사용
+              bookmarkId: null,
+              categoryId: categoryId,
+              createdAt: new Date().toISOString()
+            };
+            
+            // 공유 링크 추가
+            set((state) => {
+              const newLinks = [...state.sharedLinks, newShareLink];
+              return { sharedLinks: newLinks };
+            });
+            
+            return newShareLink;
+          } catch (error) {
+            throw new Error("공유 링크 생성에 실패했습니다.");
+          }
         }
         
-        const newShareLink = {
-          id: uuidv4(),
-          uuid: uuidv4(),
-          bookmarkId: bookmarkId || null,
-          categoryId: categoryId || null,
-          createdAt: new Date().toISOString()
-        };
-        // 기존 공유 링크 확인
-        // 공유 링크 추가
-        set((state) => {
-          const newLinks = [...state.sharedLinks, newShareLink];
-          return { sharedLinks: newLinks };
-        });
+        // 북마크 공유는 아직 백엔드 API가 없으므로 기존 로직 유지
+        if (bookmarkId) {
+          const newShareLink = {
+            id: uuidv4(),
+            uuid: uuidv4(),
+            bookmarkId: bookmarkId,
+            categoryId: null,
+            createdAt: new Date().toISOString()
+          };
+          
+          set((state) => {
+            const newLinks = [...state.sharedLinks, newShareLink];
+            return { sharedLinks: newLinks };
+          });
+          
+          return newShareLink;
+        }
         
-        return newShareLink;
+        throw new Error("북마크 ID 또는 카테고리 ID가 필요합니다.");
       },
       
-      getShareLinkByUuid: (uuid) => {
-        if (!uuid || !get().sharedLinks) {
+      getShareLinkByUuid: async (uuid) => {
+        if (!uuid) {
           return null;
         }
         
-        const link = get().sharedLinks.find(link => link.uuid === uuid);
-        if (!link) {
-          return null;
-        }
+        // 1. 먼저 로컬 공유 링크에서 찾기 (북마크 공유용)
+        const localLinks = get().sharedLinks;
+        const localLink = localLinks.find(link => link.uuid === uuid);
         
-        // 북마크 공유인 경우
-        if (link.bookmarkId) {
-          const bookmark = get().bookmarks.find(b => b.id === link.bookmarkId);
-          return { link, bookmarkData: bookmark };
-        }
-        
-        // 카테고리 공유인 경우
-        if (link.categoryId) {
-          const category = get().categories.find(c => c.id === link.categoryId);
-          if (category) {
-            const categoryBookmarks = get().getCategoryBookmarks(category.id);
+        if (localLink) {
+          // 북마크 공유인 경우
+          if (localLink.bookmarkId) {
+            const bookmark = get().bookmarks.find(b => b.id === localLink.bookmarkId);
+            return { link: localLink, bookmarkData: bookmark };
           }
           
-          return { link, categoryData: category };
+          // 로컬 카테고리 공유인 경우
+          if (localLink.categoryId) {
+            const category = get().categories.find(c => c.id === localLink.categoryId);
+            return { link: localLink, categoryData: category };
+          }
         }
         
-        return { link };
+                 // 2. 백엔드에서 공유된 카테고리 조회 시도
+         try {
+           const sharedCategoryData = await categoryService.getSharedCategory(uuid);
+           
+           if (sharedCategoryData && sharedCategoryData.category) {
+             // 백엔드 응답을 프론트엔드 형식으로 변환
+             const categoryInfo = sharedCategoryData.category;
+             const tagData = categoryInfo.tags || categoryInfo.tagNames || [];
+             
+             const category = {
+               id: categoryInfo.id,
+               title: categoryInfo.title,
+               tagList: Array.isArray(tagData) ? tagData.map((tag: any) => {
+                 if (typeof tag === 'string') {
+                   return {
+                     id: `tag-${tag}`,
+                     name: tag,
+                     userId: sharedCategoryData.owner.id
+                   };
+                 }
+                 return {
+                   id: tag.id,
+                   name: tag.name,
+                   userId: sharedCategoryData.owner.id
+                 };
+               }) : [],
+               createdAt: categoryInfo.createdAt,
+               updatedAt: categoryInfo.updatedAt,
+               userId: sharedCategoryData.owner.id,
+               isPublic: categoryInfo.isPublic
+             };
+             
+             // 가상의 공유 링크 객체 생성
+             const shareLink = {
+               id: uuid,
+               uuid: uuid,
+               bookmarkId: null,
+               categoryId: categoryInfo.id,
+               createdAt: categoryInfo.createdAt
+             };
+             
+             return { link: shareLink, categoryData: category };
+           }
+         } catch (error) {
+           // 백엔드에서 찾을 수 없는 경우 null 반환
+         }
+        
+        return null;
       },
       
       // 카테고리에 북마크를 추가하는 함수 (가져오기 기능)
@@ -1268,7 +1369,9 @@ export const useBookmarkStore = create<BookmarkState>()(
                 await state.loadUserBookmarks();
                 // 2. 백엔드에서 카테고리 데이터 로드
                 await state.loadUserCategories();
-                // 3. 추가적인 데이터 로드 로직 (나중에 확장 가능)
+                // 3. 백엔드에서 태그 데이터 로드
+                await state.loadUserTags();
+                // 4. 추가적인 데이터 로드 로직 (나중에 확장 가능)
                 
               } catch (error) {
               }
@@ -1288,6 +1391,8 @@ export const useBookmarkStore = create<BookmarkState>()(
                     await state.loadUserBookmarks();
                     // 카테고리 데이터도 로드
                     await state.loadUserCategories();
+                    // 태그 데이터도 로드
+                    await state.loadUserTags();
                   }
                 } catch (autoLoginError) {
                 }

@@ -46,10 +46,10 @@ export const BookmarkList: React.FC<BookmarkListProps> = ({ categoryId }) => {
           
           // API 응답을 프론트엔드 Bookmark 형식으로 변환
           const formattedBookmarks: Bookmark[] = response.map(item => {
-            // 태그 변환
-            const tagList: Tag[] = (item.tags || []).map(tag => ({
-              id: tag.id || `tag-${Math.random()}`,
-              name: tag.name,
+            // 태그 변환: 백엔드에서 tagNames 필드로 태그 정보가 전달됨
+            const tagList: Tag[] = (item.tagNames || []).map(tag => ({
+              id: tag.id || `tag-${tag.name || 'unknown'}-${Math.random()}`,
+              name: tag.name || '무제 태그',
               userId: currentUser?.id || ''
             }));
             

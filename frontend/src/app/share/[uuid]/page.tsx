@@ -21,6 +21,8 @@ export default function SharedView({ params }: SharedViewProps) {
     categories, 
     importCategoryWithBookmarks,
     addBookmark,
+    addCategory,
+    findOrCreateTag,
     getCategoryBookmarks,
     getShareLinkByUuid,
     currentUser,
@@ -65,7 +67,7 @@ export default function SharedView({ params }: SharedViewProps) {
       }
       try {
         // 스토어에서 공유 링크 조회
-        const shareData = getShareLinkByUuid(uuid);
+        const shareData = await getShareLinkByUuid(uuid);
         // 스토어에서 찾지 못한 경우 로컬 스토리지에서 직접 조회
         if (!shareData || !shareData.link) {
           const sharedLinks = getSharedLinksFromLocalStorage();
@@ -107,14 +109,41 @@ export default function SharedView({ params }: SharedViewProps) {
               // 백엔드 API를 직접 호출하여 카테고리에 할당된 북마크 가져오기
               const categoryBookmarksData = await categoryService.getBookmarksByCategory(category.id);
               
+              // 디버깅: 전체 응답 데이터 확인
+              console.log('카테고리 북마크 전체 응답:', categoryBookmarksData);
+              
               // API 응답을 프론트엔드 Bookmark 형식으로 변환
               const formattedBookmarks: Bookmark[] = categoryBookmarksData.map(item => {
-                // 태그 변환
-                const tagList: Tag[] = (item.tags || []).map(tag => ({
-                  id: tag.id || `tag-${Math.random()}`,
-                  name: tag.name,
-                  userId: currentUser?.id || ''
-                }));
+                // 디버깅: 백엔드에서 받은 태그 데이터 확인
+                console.log('백엔드에서 받은 북마크 데이터:', item);
+                console.log('북마크의 tagNames 데이터:', item.tagNames);
+                
+                // 태그 변환: 백엔드에서 tagNames 필드로 태그 정보가 전달됨
+                const tagData = item.tagNames || [];
+                const tagList: Tag[] = tagData.map((tag: any) => {
+                  // TagResponseDto 객체인 경우 (id와 name이 있는 경우)
+                  if (typeof tag === 'object' && tag.name) {
+                    return {
+                      id: tag.id || `tag-${tag.name}-${Math.random()}`,
+                      name: tag.name,
+                      userId: currentUser?.id || ''
+                    };
+                  }
+                  // 문자열인 경우 (태그 이름만 있는 경우)
+                  if (typeof tag === 'string') {
+                    return {
+                      id: `tag-${tag}-${Math.random()}`,
+                      name: tag,
+                      userId: currentUser?.id || ''
+                    };
+                  }
+                  // 기본값
+                  return {
+                    id: `tag-unknown-${Math.random()}`,
+                    name: '무제 태그',
+                    userId: currentUser?.id || ''
+                  };
+                });
                 
                 return {
                   id: item.id,
@@ -162,12 +191,36 @@ export default function SharedView({ params }: SharedViewProps) {
               
               // API 응답을 프론트엔드 Bookmark 형식으로 변환
               const formattedBookmarks: Bookmark[] = categoryBookmarksData.map(item => {
-                // 태그 변환
-                const tagList: Tag[] = (item.tags || []).map(tag => ({
-                  id: tag.id || `tag-${Math.random()}`,
-                  name: tag.name,
-                  userId: currentUser?.id || ''
-                }));
+                // 디버깅: 백엔드에서 받은 태그 데이터 확인
+                console.log('백엔드에서 받은 북마크 데이터 (두번째):', item);
+                console.log('북마크의 tagNames 데이터 (두번째):', item.tagNames);
+                
+                // 태그 변환: 백엔드에서 tagNames 필드로 태그 정보가 전달됨
+                const tagData = item.tagNames || [];
+                const tagList: Tag[] = tagData.map((tag: any) => {
+                  // TagResponseDto 객체인 경우 (id와 name이 있는 경우)
+                  if (typeof tag === 'object' && tag.name) {
+                    return {
+                      id: tag.id || `tag-${tag.name}-${Math.random()}`,
+                      name: tag.name,
+                      userId: currentUser?.id || ''
+                    };
+                  }
+                  // 문자열인 경우 (태그 이름만 있는 경우)
+                  if (typeof tag === 'string') {
+                    return {
+                      id: `tag-${tag}-${Math.random()}`,
+                      name: tag,
+                      userId: currentUser?.id || ''
+                    };
+                  }
+                  // 기본값
+                  return {
+                    id: `tag-unknown-${Math.random()}`,
+                    name: '무제 태그',
+                    userId: currentUser?.id || ''
+                  };
+                });
                 
                 return {
                   id: item.id,
@@ -244,24 +297,78 @@ export default function SharedView({ params }: SharedViewProps) {
     }
     
     try {
-      // 카테고리 ID가 유효한지 확인
-      if (!sharedCategory.id) {
-        toast.error('유효하지 않은 카테고리입니다');
+      // 1. 카테고리 태그 처리
+      let categoryTagList: Tag[] = [];
+      if (sharedCategory.tagList && sharedCategory.tagList.length > 0) {
+        const categoryTagPromises = sharedCategory.tagList.map(async (tag) => {
+          try {
+            return await findOrCreateTag(tag.name);
+          } catch (error) {
+            console.error('카테고리 태그 생성/조회 실패:', error);
+            return null;
+          }
+        });
+        
+        const createdCategoryTags = await Promise.all(categoryTagPromises);
+        categoryTagList = createdCategoryTags.filter(tag => tag !== null) as Tag[];
+      }
+      
+      // 2. 새 카테고리 생성
+      const newCategoryId = await addCategory({
+        title: sharedCategory.title,
+        tagList: categoryTagList,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        userId: currentUser.id,
+        isPublic: false // 가져온 카테고리는 기본적으로 비공개
+      });
+      
+      if (!newCategoryId) {
+        toast.error('카테고리 생성에 실패했습니다');
         return;
       }
       
-      // importCategoryWithBookmarks는 비동기 함수이므로 await 처리
-      const newCategory = await importCategoryWithBookmarks(sharedCategory.id);
-      
-      // newCategory가 null이 아닐 때만 성공 처리
-      if (newCategory !== null) {
-        // 카테고리 생성 성공 메시지 표시
-        toast.success('카테고리를 성공적으로 가져왔습니다');
-        router.push('/');
-      } else {
-        toast.error('카테고리 가져오기에 실패했습니다');
+      // 3. 카테고리에 포함된 북마크들도 복사
+      if (categoryBookmarks && categoryBookmarks.length > 0) {
+        const copyPromises = categoryBookmarks.map(async (bookmark) => {
+          try {
+            // 태그가 있는 경우 태그를 먼저 생성/조회
+            let processedTagList: Tag[] = [];
+            if (bookmark.tagList && bookmark.tagList.length > 0) {
+              const tagPromises = bookmark.tagList.map(async (tag) => {
+                try {
+                  return await findOrCreateTag(tag.name);
+                } catch (error) {
+                  console.error('태그 생성/조회 실패:', error);
+                  return null;
+                }
+              });
+              
+              const createdTags = await Promise.all(tagPromises);
+              processedTagList = createdTags.filter(tag => tag !== null);
+            }
+            
+            await addBookmark({
+              title: bookmark.title,
+              url: bookmark.url,
+              description: bookmark.description,
+              categoryId: newCategoryId,
+              tagList: processedTagList,
+              updatedAt: new Date().toISOString(),
+              integrated: false
+            });
+          } catch (error) {
+            console.error('북마크 복사 실패:', error);
+          }
+        });
+        
+        await Promise.all(copyPromises);
       }
+      
+      toast.success(`카테고리 "${sharedCategory.title}"를 성공적으로 가져왔습니다`);
+      router.push('/');
     } catch (err) {
+      console.error('카테고리 가져오기 오류:', err);
       toast.error('카테고리 가져오기 중 오류가 발생했습니다');
     }
   };

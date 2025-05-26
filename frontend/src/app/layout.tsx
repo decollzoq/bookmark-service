@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Navbar } from '@/components/Navbar';
 import { AuthProvider } from '@/components/AuthProvider';
+import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
   title: '북마크 저장 및 공유 서비스',
@@ -28,6 +29,26 @@ export default function RootLayout({
               </p>
             </div>
           </footer>
+          <Toaster
+            position="bottom-center"
+            toastOptions={{
+              duration: 3000,
+              style: {
+                background: '#363636',
+                color: '#fff',
+              },
+              success: {
+                style: {
+                  background: '#10b981',
+                },
+              },
+              error: {
+                style: {
+                  background: '#ef4444',
+                },
+              },
+            }}
+          />
         </AuthProvider>
       </body>
     </html>
