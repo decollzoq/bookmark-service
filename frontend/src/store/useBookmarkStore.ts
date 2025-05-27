@@ -1039,53 +1039,83 @@ export const useBookmarkStore = create<BookmarkState>()(
         }
         
                  // 2. 백엔드에서 공유된 카테고리 조회 시도
-         try {
-           const sharedCategoryData = await categoryService.getSharedCategory(uuid);
-           
-           if (sharedCategoryData && sharedCategoryData.category) {
-             // 백엔드 응답을 프론트엔드 형식으로 변환
-             const categoryInfo = sharedCategoryData.category;
-             const tagData = categoryInfo.tags || categoryInfo.tagNames || [];
-             
-             const category = {
-               id: categoryInfo.id,
-               title: categoryInfo.title,
-               tagList: Array.isArray(tagData) ? tagData.map((tag: any) => {
-                 if (typeof tag === 'string') {
-                   return {
-                     id: `tag-${tag}`,
-                     name: tag,
-                     userId: sharedCategoryData.owner.id
-                   };
-                 }
-                 return {
-                   id: tag.id,
-                   name: tag.name,
-                   userId: sharedCategoryData.owner.id
-                 };
-               }) : [],
-               createdAt: categoryInfo.createdAt,
-               updatedAt: categoryInfo.updatedAt,
-               userId: sharedCategoryData.owner.id,
-               isPublic: categoryInfo.isPublic
-             };
-             
-             // 가상의 공유 링크 객체 생성
-             const shareLink = {
-               id: uuid,
-               uuid: uuid,
-               bookmarkId: null,
-               categoryId: categoryInfo.id,
-               createdAt: categoryInfo.createdAt
-             };
-             
-             return { link: shareLink, categoryData: category };
-           }
-         } catch (error) {
-           // 백엔드에서 찾을 수 없는 경우 null 반환
-         }
-        
+        try {
+          const sharedCategoryData = await categoryService.getSharedCategory(uuid);
+
+          if (sharedCategoryData && sharedCategoryData.category) {
+            const categoryInfo = sharedCategoryData.category;
+            const tagData = categoryInfo.tags || categoryInfo.tagNames || [];
+
+            const category = {
+              id: categoryInfo.id,
+              title: categoryInfo.title,
+              tagList: Array.isArray(tagData) ? tagData.map((tag: any) => {
+                if (typeof tag === 'string') {
+                  return {
+                    id: `tag-${tag}`,
+                    name: tag,
+                    userId: sharedCategoryData.owner.id
+                  };
+                }
+                return {
+                  id: tag.id,
+                  name: tag.name,
+                  userId: sharedCategoryData.owner.id
+                };
+              }) : [],
+              createdAt: categoryInfo.createdAt,
+              updatedAt: categoryInfo.updatedAt,
+              userId: sharedCategoryData.owner.id,
+              isPublic: categoryInfo.isPublic
+            };
+
+            const bookmarks = (sharedCategoryData.bookmarks || []).map((item: any) => {
+              const tagList = (item.tagNames || []).map((tag: any) => {
+                if (typeof tag === 'string') {
+                  return {
+                    id: `tag-${tag}`,
+                    name: tag,
+                    userId: sharedCategoryData.owner.id
+                  };
+                }
+                return {
+                  id: tag.id,
+                  name: tag.name,
+                  userId: sharedCategoryData.owner.id
+                };
+              });
+
+              return {
+                id: item.id,
+                title: item.title,
+                url: item.url,
+                description: item.description || '',
+                categoryId: item.categoryId || categoryInfo.id,
+                tagList: tagList,
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt,
+                isFavorite: item.isFavorite || false,
+                userId: sharedCategoryData.owner.id,
+                integrated: false
+              };
+            });
+
+            const shareLink = {
+              id: uuid,
+              uuid: uuid,
+              bookmarkId: null,
+              categoryId: categoryInfo.id,
+              createdAt: categoryInfo.createdAt
+            };
+
+            return { link: shareLink, categoryData: category, bookmarks };
+          }
+        } catch (error) {
+          console.error('공유 링크 조회 실패:', error);
+        }
+
         return null;
+
       },
       
       // 카테고리에 북마크를 추가하는 함수 (가져오기 기능)

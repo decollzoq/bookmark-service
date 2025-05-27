@@ -34,6 +34,21 @@ interface ShareCategoryResponse {
   };
 }
 
+type ShareCategoryFlatResponse = {
+  id: string;
+  title: string;
+  tagNames: string[] | Tag[];
+  createdAt: string;
+  updatedAt: string;
+  bookmarks?: BookmarkResponse[];
+  isPublic: boolean;
+  owner?: {
+    id: string;
+    name: string;
+  };
+};
+
+
 // 카테고리 관련 서비스
 const categoryService = {
   // 모든 카테고리 조회
@@ -83,8 +98,19 @@ const categoryService = {
   
   // 공유된 카테고리 조회
   getSharedCategory: async (token: string): Promise<ShareCategoryResponse> => {
-    const response = await apiClient.get<ShareCategoryResponse>(`/api/categories/share/${token}`);
-    return response.data;
+    const response = await apiClient.get<ShareCategoryFlatResponse>(`/api/categories/share/${token}`);
+    return {
+      category: {
+        id: response.data.id,
+        title: response.data.title,
+        isPublic: response.data.isPublic,
+        tagNames: response.data.tagNames,
+        createdAt: response.data.createdAt,
+        updatedAt: response.data.updatedAt
+      },
+      bookmarks: response.data.bookmarks || [],
+      owner: response.data.owner || { id: '', name: '' }
+    };
   },
   
   // 공유된 카테고리 가져오기
