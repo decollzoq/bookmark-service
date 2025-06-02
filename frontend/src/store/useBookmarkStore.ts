@@ -1176,16 +1176,16 @@ export const useBookmarkStore = create<BookmarkState>()(
           // 사용자 입력 이메일 저장 (로그인 시 입력한 이메일 사용)
           safeLocalStorage.setItem('userEmail', email);
           
+          let userInfo: User;
+          
           // 백엔드에서 받은 사용자 정보 사용
           if (user) {
             // 백엔드에서 받은 user 객체에서 nickname 필드를 username으로 매핑
-            const userWithEmail = {
+            userInfo = {
               ...user,
               username: user.nickname,  // 백엔드의 nickname을 username으로 사용
               email: email  // 입력된 이메일 사용
             };
-            set({ currentUser: userWithEmail });
-            return userWithEmail;
           } else {
             // 토큰에서 사용자 정보 추출
             const decoded = jwtDecode(accessToken) as any;
@@ -1194,15 +1194,27 @@ export const useBookmarkStore = create<BookmarkState>()(
             // 닉네임 필드를 직접 사용 (MongoDB에 저장된 nickname 필드 참조)
             const nickname = decoded.nickname;
             
-            const userInfo = {
+            userInfo = {
               id: userId || ('user-' + Date.now()),
               username: nickname || email, // 닉네임이 없는 경우에만 이메일을 대체값으로 사용
               email: email
             };
-            
-            set({ currentUser: userInfo });
-            return userInfo;
           }
+          
+          // 사용자 정보 설정
+          set({ currentUser: userInfo });
+          
+          // 로그인 성공 후 즉시 사용자 데이터 로드
+          try {
+            await get().loadUserBookmarks();
+            await get().loadUserCategories();
+            await get().loadUserTags();
+          } catch (dataError) {
+            console.error('로그인 후 데이터 로드 실패:', dataError);
+            // 데이터 로드 실패해도 로그인은 성공으로 처리
+          }
+          
+          return userInfo;
         } catch (error) {
           throw error;
         }
@@ -1231,28 +1243,40 @@ export const useBookmarkStore = create<BookmarkState>()(
             safeLocalStorage.setItem('accessToken', accessToken);
             safeLocalStorage.setItem('refreshToken', refreshToken);
             
+            let userInfo: User;
+            
             // 백엔드에서 받은 사용자 정보 사용
             if (user) {
               // 백엔드에서 받은 user 객체에서 nickname 필드를 username으로 매핑
-              const userWithEmail = {
+              userInfo = {
                 ...user,
                 username: user.nickname, // 백엔드의 nickname을 username으로 사용
                 email: email  // 입력된 이메일 사용
               };
-              set({ currentUser: userWithEmail });
             } else {
               // 토큰에서 사용자 정보 추출
               const decoded = jwtDecode(accessToken) as any;
               const userId = getIdFromToken(accessToken);
               
               // 회원가입 시 설정한 닉네임 사용
-              const userInfo = {
+              userInfo = {
                 id: userId || ('user-' + Date.now()),
                 username: username, // 회원가입 시 입력한 username 값(nickname)을 그대로 사용
                 email: email
               };
-              
-              set({ currentUser: userInfo });
+            }
+            
+            // 사용자 정보 설정
+            set({ currentUser: userInfo });
+            
+            // 회원가입 후 자동 로그인 성공 시 데이터 로드
+            try {
+              await get().loadUserBookmarks();
+              await get().loadUserCategories();
+              await get().loadUserTags();
+            } catch (dataError) {
+              console.error('회원가입 후 데이터 로드 실패:', dataError);
+              // 데이터 로드 실패해도 회원가입은 성공으로 처리
             }
           } catch (loginError) {
             // 자동 로그인 실패해도 회원가입은 성공했으므로 원래 결과 반환
@@ -1368,6 +1392,7 @@ export const useBookmarkStore = create<BookmarkState>()(
                 // 4. 추가적인 데이터 로드 로직 (나중에 확장 가능)
                 
               } catch (error) {
+                console.error('하이드레이션 후 데이터 로드 실패:', error);
               }
             } else {
               // 로컬 스토리지에 토큰이 있는지 확인
@@ -1381,14 +1406,13 @@ export const useBookmarkStore = create<BookmarkState>()(
                   if (user) {
                     // 사용자 상태 업데이트
                     state.currentUser = user;
-                    // 데이터 로드 재시도
+                    // 자동 로그인 후 데이터 로드
                     await state.loadUserBookmarks();
-                    // 카테고리 데이터도 로드
                     await state.loadUserCategories();
-                    // 태그 데이터도 로드
                     await state.loadUserTags();
                   }
                 } catch (autoLoginError) {
+                  console.error('자동 로그인 실패:', autoLoginError);
                 }
               }
             }

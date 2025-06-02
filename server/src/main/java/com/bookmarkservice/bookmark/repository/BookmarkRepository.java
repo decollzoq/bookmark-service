@@ -16,5 +16,6 @@ public interface BookmarkRepository extends MongoRepository<Bookmark, String> {
     // 전체 북마크 검색 메서드들 (카테고리 기반 필터링용)
     List<Bookmark> findByTitleContainingIgnoreCase(String keyword);
     List<Bookmark> findByDescriptionContainingIgnoreCase(String keyword);
+    List<Bookmark> findByUrlContainingIgnoreCase(String keyword);
 }
 

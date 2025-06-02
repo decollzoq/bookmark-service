@@ -115,7 +115,7 @@ export default function Home() {
     };
     
     fetchCategoryBookmarks();
-  }, [activeCategory, currentUser?.id]); // userBookmarks 의존성 제거하여 무한 렌더링 방지
+  }, [activeCategory, currentUser?.id, userBookmarks.length]); // userBookmarks.length 의존성 추가하여 북마크 로드 완료 후 실행
   
   // 내 북마크 검색 결과 계산
   const mySearchResults = useMemo(() => {
@@ -152,10 +152,12 @@ export default function Home() {
         
         try {
           results = await bookmarkService.searchAllBookmarks(searchTerm);
+          console.log('공개 카테고리 검색 결과:', results);
         } catch (apiError: any) {
+          console.error('공개 카테고리 검색 API 오류:', apiError);
           // API가 구현되지 않았거나 오류 발생 시 임시 처리
           if (apiError.response?.status === 500 || apiError.response?.status === 404) {
-                                console.warn('공개 카테고리 검색 API가 아직 구현되지 않았습니다. 기존 API를 사용합니다.');
+            console.warn('공개 카테고리 검색 API가 아직 구현되지 않았습니다. 기존 API를 사용합니다.');
             setPublicSearchError('공개 카테고리 검색 API 준비 중 (임시로 내 북마크 API 사용)');
             // 기존 검색 API 사용 (임시)
             results = await bookmarkService.searchBookmarks(searchTerm);
@@ -216,16 +218,8 @@ export default function Home() {
       return mySearchResults;
     }
     
-    // 통합 모드: 내 북마크 + 공개 북마크 (중복 제거)
-    const combined = [...mySearchResults];
-    const myBookmarkUrls = new Set(mySearchResults.map(b => b.url)); // URL로 중복 제거
-    
-    publicSearchResults.forEach(publicBookmark => {
-      // URL이 같지 않은 경우에만 추가 (중복 제거)
-      if (!myBookmarkUrls.has(publicBookmark.url)) {
-        combined.push(publicBookmark);
-      }
-    });
+    // 통합 모드: 내 북마크 + 공개 북마크 (중복 제거 없이 모두 표시)
+    const combined = [...mySearchResults, ...publicSearchResults];
     
     return combined;
   }, [mySearchResults, publicSearchResults, showIntegrated]);

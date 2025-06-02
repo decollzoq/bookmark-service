@@ -94,8 +94,8 @@ public class BookmarkService {
 
     // 공개 카테고리 북마크 검색
     public List<BookmarkResponseDto> searchPublicCategoryBookmarks(String keyword) {
-        // 1. 공개 카테고리들 조회
-        List<Category> publicCategories = categoryRepository.findByIsPublicTrueAndTitleContainingIgnoreCase(keyword);
+        // 1. 모든 공개 카테고리들 조회
+        List<Category> publicCategories = categoryRepository.findByIsPublicTrue();
         
         // 2. 공개 카테고리들의 태그 ID 수집
         List<String> publicTagIds = publicCategories.stream()
@@ -107,12 +107,14 @@ public class BookmarkService {
             return List.of(); // 공개 카테고리가 없으면 빈 리스트 반환
         }
         
-        // 3. 해당 태그들을 가진 북마크들 조회
+        // 3. 키워드와 일치하는 모든 북마크들 조회 (제목, 설명, URL 검색)
         List<Bookmark> titleMatches = bookmarkRepository.findByTitleContainingIgnoreCase(keyword);
         List<Bookmark> descriptionMatches = bookmarkRepository.findByDescriptionContainingIgnoreCase(keyword);
+        List<Bookmark> urlMatches = bookmarkRepository.findByUrlContainingIgnoreCase(keyword);
         
         // 4. 중복 제거하여 합치기
-        List<Bookmark> allMatches = Stream.concat(titleMatches.stream(), descriptionMatches.stream())
+        List<Bookmark> allMatches = Stream.of(titleMatches.stream(), descriptionMatches.stream(), urlMatches.stream())
+                .flatMap(stream -> stream)
                 .distinct()
                 .collect(Collectors.toList());
 
