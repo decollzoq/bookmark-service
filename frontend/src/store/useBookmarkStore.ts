@@ -268,7 +268,7 @@ export const useBookmarkStore = create<BookmarkState>()(
               // 객체인 경우 (id와 name이 있는 경우)
               if (tagItem.id) {
                 // ID가 있는 경우 그대로 사용
-                return {
+              return {
                   id: tagItem.id,
                   name: tagItem.name || '무제 태그',
                   userId: currentUser.id
@@ -351,7 +351,7 @@ export const useBookmarkStore = create<BookmarkState>()(
         const category = categories.find(c => c.id === categoryId);
         if (!category) {
           return [];
-        }
+          }
         
         // 1. 먼저 직접 카테고리 ID로 연결된 북마크 찾기
         const directBookmarks = bookmarks.filter(bookmark => 
@@ -813,9 +813,9 @@ export const useBookmarkStore = create<BookmarkState>()(
               };
             }
             return {
-              id: tag.id,
-              name: tag.name,
-              userId: currentUser.id
+            id: tag.id,
+            name: tag.name,
+            userId: currentUser.id
             };
           });
         
@@ -968,27 +968,27 @@ export const useBookmarkStore = create<BookmarkState>()(
           // 카테고리에 태그가 없는 경우 경고
           if (category.tagList.length === 0) {
             console.warn("태그가 없는 카테고리:", category);
-          }
+        }
           
           try {
             // 백엔드 API를 호출하여 실제 공유 토큰 생성
             const shareToken = await categoryService.generateShareToken(categoryId);
-            
-            const newShareLink = {
-              id: uuidv4(),
+        
+        const newShareLink = {
+          id: uuidv4(),
               uuid: shareToken, // 백엔드에서 받은 토큰 사용
               bookmarkId: null,
               categoryId: categoryId,
-              createdAt: new Date().toISOString()
-            };
-            
-            // 공유 링크 추가
-            set((state) => {
-              const newLinks = [...state.sharedLinks, newShareLink];
-              return { sharedLinks: newLinks };
-            });
-            
-            return newShareLink;
+          createdAt: new Date().toISOString()
+        };
+        
+        // 공유 링크 추가
+        set((state) => {
+          const newLinks = [...state.sharedLinks, newShareLink];
+          return { sharedLinks: newLinks };
+        });
+        
+        return newShareLink;
           } catch (error) {
             throw new Error("공유 링크 생성에 실패했습니다.");
           }
@@ -1200,9 +1200,9 @@ export const useBookmarkStore = create<BookmarkState>()(
               email: email
             };
           }
-          
+            
           // 사용자 정보 설정
-          set({ currentUser: userInfo });
+            set({ currentUser: userInfo });
           
           // 로그인 성공 후 즉시 사용자 데이터 로드
           try {
@@ -1214,7 +1214,7 @@ export const useBookmarkStore = create<BookmarkState>()(
             // 데이터 로드 실패해도 로그인은 성공으로 처리
           }
           
-          return userInfo;
+            return userInfo;
         } catch (error) {
           throw error;
         }
@@ -1265,9 +1265,9 @@ export const useBookmarkStore = create<BookmarkState>()(
                 email: email
               };
             }
-            
+              
             // 사용자 정보 설정
-            set({ currentUser: userInfo });
+              set({ currentUser: userInfo });
             
             // 회원가입 후 자동 로그인 성공 시 데이터 로드
             try {

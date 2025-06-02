@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { Bookmark, Category, Tag } from '@/types';
 import categoryService from '@/api/categoryService';
 import bookmarkService from '@/api/bookmarkService';
-
+import { toast } from 'react-hot-toast';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 export default function Home() {
   const { 
@@ -34,6 +35,10 @@ export default function Home() {
   const [isSearchingPublic, setIsSearchingPublic] = useState(false);
   const [publicSearchError, setPublicSearchError] = useState<string | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+  
+  // 삭제 확인 모달 상태
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [bookmarkToDelete, setBookmarkToDelete] = useState<Bookmark | null>(null);
   
   // 컴포넌트 마운트 시 백엔드에서 북마크 데이터 로드
   useEffect(() => {
@@ -268,22 +273,68 @@ export default function Home() {
   const handleShareBookmark = async (bookmark: Bookmark) => {
     try {
       const shareLink = await createShareLink({ bookmarkId: bookmark.id });
-    const fullShareUrl = `${window.location.origin}/share/${shareLink.uuid}`;
-    
-    if (!navigator.clipboard) {
-      alert(`클립보드 API를 사용할 수 없습니다. 수동으로 복사해주세요: ${fullShareUrl}`);
-      return;
-    }
-    
-      navigator.clipboard.writeText(fullShareUrl)
-        .then(() => {
-          alert('북마크 링크가 클립보드에 복사되었습니다.');
-        })
-        .catch((error) => {
-          alert(`북마크 링크: ${fullShareUrl} (수동으로 복사해주세요)`);
+      const fullShareUrl = `${window.location.origin}/share/${shareLink.uuid}`;
+      
+      if (!navigator.clipboard) {
+        toast.error('클립보드 API를 사용할 수 없습니다. 브라우저가 클립보드 접근을 지원하지 않습니다.', {
+          duration: 5000,
+          position: 'bottom-center',
+          style: {
+            background: '#EF4444',
+            color: 'white',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: '500',
+            padding: '12px 16px'
+          },
+          icon: '❌'
         });
+        return;
+      }
+      
+      try {
+        await navigator.clipboard.writeText(fullShareUrl);
+        toast.success('링크가 복사되었습니다! 🎉', {
+          duration: 4000,
+          position: 'bottom-center',
+          style: {
+            background: '#10B981',
+            color: 'white',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: '500',
+            padding: '12px 16px'
+          },
+          icon: '📋'
+        });
+      } catch (clipboardError) {
+        toast.success(`북마크 링크: ${fullShareUrl}`, {
+          duration: 6000,
+          position: 'bottom-center',
+          style: {
+            background: '#10B981',
+            color: 'white',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: '500',
+            padding: '12px 16px'
+          }
+        });
+      }
     } catch (err) {
-      alert('북마크 공유 링크 생성에 실패했습니다.');
+      toast.error('링크 복사에 실패했습니다.', {
+        duration: 4000,
+        position: 'bottom-center',
+        style: {
+          background: '#EF4444',
+          color: 'white',
+          borderRadius: '8px',
+          fontSize: '14px',
+          fontWeight: '500',
+          padding: '12px 16px'
+        },
+        icon: '❌'
+      });
     }
   };
   
@@ -351,9 +402,8 @@ export default function Home() {
         <button
           key={`delete-${bookmark.id}`}
           onClick={() => {
-            if (window.confirm(`"${bookmark.title}" 북마크를 삭제하시겠습니까?`)) {
-              deleteBookmark(bookmark.id);
-            }
+            setShowDeleteModal(true);
+            setBookmarkToDelete(bookmark);
           }}
           className="p-1.5 text-gray-600 hover:text-red-600"
           title="삭제"
@@ -499,7 +549,19 @@ export default function Home() {
                                 onClick={() => {
                                   // 공개 카테고리 북마크를 내 북마크로 복사하는 기능 (추후 구현 가능)
                                   navigator.clipboard.writeText(bookmark.url);
-                                  alert('URL이 클립보드에 복사되었습니다.');
+                                  toast.success('URL이 클립보드에 복사되었습니다! 🎉', {
+                                    duration: 3000,
+                                    position: 'bottom-center',
+                                    style: {
+                                      background: '#10B981',
+                                      color: 'white',
+                                      borderRadius: '8px',
+                                      fontSize: '14px',
+                                      fontWeight: '500',
+                                      padding: '12px 16px'
+                                    },
+                                    icon: '📋'
+                                  });
                                 }}
                                 className="p-1 text-gray-600 hover:text-gray-900 text-sm"
                                 title="URL 복사"
@@ -674,6 +736,39 @@ export default function Home() {
         </div>
       </div>
         </>
+      )}
+      
+      {/* 삭제 확인 모달 */}
+      {showDeleteModal && bookmarkToDelete && (
+        <ConfirmModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={() => {
+            deleteBookmark(bookmarkToDelete.id);
+            
+            // 삭제 성공 토스트 메시지
+            toast.success(`"${bookmarkToDelete.title}" 북마크가 삭제되었습니다.`, {
+              duration: 3000,
+              position: 'bottom-center',
+              style: {
+                background: '#10B981',
+                color: 'white',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                padding: '12px 16px'
+              },
+              icon: '🗑️'
+            });
+            
+            setShowDeleteModal(false);
+          }}
+          title="북마크 삭제"
+          message={`"${bookmarkToDelete.title}" 북마크를 삭제하시겠습니까?`}
+          confirmText="삭제하기"
+          cancelText="취소"
+          confirmButtonColor="bg-red-600 hover:bg-red-700"
+        />
       )}
     </div>
   );

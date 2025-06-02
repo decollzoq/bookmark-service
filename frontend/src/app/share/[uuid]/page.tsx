@@ -59,21 +59,21 @@ export default function SharedView({ params }: SharedViewProps) {
         
         if (!shareData || !shareData.link) {
           setError('유효하지 않은 공유 링크입니다. 링크가 만료되었거나 삭제되었을 수 있습니다.');
-          setLoading(false);
-          return;
-        }
-        
-        // 북마크 공유 처리
-        if (shareData.link.bookmarkId && shareData.bookmarkData) {
-          setSharedBookmark(shareData.bookmarkData);
-          setLoading(false);
-          return;
-        }
-        
-        // 카테고리 공유 처리
-        if (shareData.link.categoryId && shareData.categoryData) {
-          setSharedCategory(shareData.categoryData);
+            setLoading(false);
+            return;
+          }
           
+          // 북마크 공유 처리
+          if (shareData.link.bookmarkId && shareData.bookmarkData) {
+            setSharedBookmark(shareData.bookmarkData);
+            setLoading(false);
+            return;
+          }
+          
+          // 카테고리 공유 처리
+          if (shareData.link.categoryId && shareData.categoryData) {
+            setSharedCategory(shareData.categoryData);
+            
           // 백엔드에서 받은 북마크 데이터가 있으면 직접 사용
           if (shareData.bookmarks && shareData.bookmarks.length > 0) {
             const formattedBookmarks: Bookmark[] = shareData.bookmarks.map((item: BookmarkResponse) => {
@@ -228,7 +228,7 @@ export default function SharedView({ params }: SharedViewProps) {
       }
       
       toast.success(`카테고리 "${sharedCategory.title}"를 성공적으로 가져왔습니다`);
-      router.push('/');
+        router.push('/');
     } catch (err) {
       console.error('카테고리 가져오기 오류:', err);
       toast.error('카테고리 가져오기 중 오류가 발생했습니다');

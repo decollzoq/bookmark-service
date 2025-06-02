@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useBookmarkStore } from '@/store/useBookmarkStore';
 import { Bookmark, Tag } from '@/types';
 import { useRouter } from 'next/navigation';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { toast } from 'react-hot-toast';
 
 export default function BookmarksPage() {
   const { 
@@ -25,6 +27,12 @@ export default function BookmarksPage() {
   const [userBookmarksList, setUserBookmarksList] = useState<Bookmark[]>([]);
   const [userTagsList, setUserTagsList] = useState<Tag[]>([]);
   
+  // 삭제 확인 모달 상태
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [bookmarkToDelete, setBookmarkToDelete] = useState<Bookmark | null>(null);
+  const [showDeleteTagModal, setShowDeleteTagModal] = useState(false);
+  const [tagToDelete, setTagToDelete] = useState<{ id: string; name: string } | null>(null);
+  
   // 클라이언트 사이드에서만 실행되는 코드
   useEffect(() => {
     setIsClient(true);
@@ -39,7 +47,19 @@ export default function BookmarksPage() {
 
   const handleCopyLink = (bookmark: Bookmark) => {
     navigator.clipboard.writeText(bookmark.url);
-    alert('링크가 복사되었습니다!');
+    toast.success('링크가 복사되었습니다! 🎉', {
+      duration: 3000,
+      position: 'bottom-center',
+      style: {
+        background: '#10B981',
+        color: 'white',
+        borderRadius: '8px',
+        fontSize: '14px',
+        fontWeight: '500',
+        padding: '12px 16px'
+      },
+      icon: '📋'
+    });
   };
   
   const handleRemoveTag = (bookmarkId: string, tagId: string) => {
@@ -60,20 +80,90 @@ export default function BookmarksPage() {
   };
   
   const handleDeleteTag = (tagId: string) => {
-    if (window.confirm('이 태그를 시스템에서 완전히 삭제하시겠습니까? 이 태그를 사용하는 모든 북마크와 카테고리에서도 제거됩니다.')) {
-      deleteTag(tagId);
+    const tag = userTagsList.find(t => t.id === tagId);
+    if (tag) {
+      setShowDeleteTagModal(true);
+      setTagToDelete({ id: tagId, name: tag.name });
+    }
+  };
+
+  const confirmDeleteTag = () => {
+    if (tagToDelete) {
+      deleteTag(tagToDelete.id);
+      
+      // 삭제 성공 토스트 메시지
+      toast.success(`"${tagToDelete.name}" 태그가 삭제되었습니다.`, {
+        duration: 3000,
+        position: 'bottom-center',
+        style: {
+          background: '#10B981',
+          color: 'white',
+          borderRadius: '8px',
+          fontSize: '14px',
+          fontWeight: '500',
+          padding: '12px 16px'
+        },
+        icon: '🗑️'
+      });
       
       // 상태 업데이트
-      setUserTagsList(prevTags => prevTags.filter(tag => tag.id !== tagId));
+      setUserTagsList(prevTags => prevTags.filter(tag => tag.id !== tagToDelete.id));
       setUserBookmarksList(prevBookmarks => 
         prevBookmarks.map(bookmark => ({
           ...bookmark,
-          tagList: bookmark.tagList.filter(tag => tag.id !== tagId)
+          tagList: bookmark.tagList.filter(tag => tag.id !== tagToDelete.id)
         }))
       );
+      
+      setShowDeleteTagModal(false);
+      setTagToDelete(null);
     }
   };
-  
+
+  const cancelDeleteTag = () => {
+    setShowDeleteTagModal(false);
+    setTagToDelete(null);
+  };
+
+  const handleDeleteBookmark = (bookmark: Bookmark) => {
+    setShowDeleteModal(true);
+    setBookmarkToDelete(bookmark);
+  };
+
+  const confirmDeleteBookmark = () => {
+    if (bookmarkToDelete) {
+      deleteBookmark(bookmarkToDelete.id);
+      
+      // 삭제 성공 토스트 메시지
+      toast.success(`"${bookmarkToDelete.title}" 북마크가 삭제되었습니다.`, {
+        duration: 3000,
+        position: 'bottom-center',
+        style: {
+          background: '#10B981',
+          color: 'white',
+          borderRadius: '8px',
+          fontSize: '14px',
+          fontWeight: '500',
+          padding: '12px 16px'
+        },
+        icon: '🗑️'
+      });
+      
+      // 상태 업데이트
+      setUserBookmarksList(prevBookmarks => 
+        prevBookmarks.filter(b => b.id !== bookmarkToDelete.id)
+      );
+      
+      setShowDeleteModal(false);
+      setBookmarkToDelete(null);
+    }
+  };
+
+  const cancelDeleteBookmark = () => {
+    setShowDeleteModal(false);
+    setBookmarkToDelete(null);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -209,15 +299,7 @@ export default function BookmarksPage() {
                     )}
                     
                     <button
-                      onClick={() => {
-                        if (window.confirm('이 북마크를 삭제하시겠습니까?')) {
-                          deleteBookmark(bookmark.id);
-                          // 상태 업데이트
-                          setUserBookmarksList(prevBookmarks => 
-                            prevBookmarks.filter(b => b.id !== bookmark.id)
-                          );
-                        }
-                      }}
+                      onClick={() => handleDeleteBookmark(bookmark)}
                       className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-red-600"
                       title="삭제"
                     >
@@ -230,6 +312,34 @@ export default function BookmarksPage() {
           </div>
         )}
       </div>
+
+      {/* 삭제 확인 모달 */}
+      {showDeleteModal && bookmarkToDelete && (
+        <ConfirmModal
+          isOpen={showDeleteModal}
+          onClose={cancelDeleteBookmark}
+          onConfirm={confirmDeleteBookmark}
+          title="북마크 삭제"
+          message={`"${bookmarkToDelete.title}" 북마크를 삭제하시겠습니까?`}
+          confirmText="삭제하기"
+          cancelText="취소"
+          confirmButtonColor="bg-red-600 hover:bg-red-700"
+        />
+      )}
+
+      {/* 태그 삭제 확인 모달 */}
+      {showDeleteTagModal && tagToDelete && (
+        <ConfirmModal
+          isOpen={showDeleteTagModal}
+          onClose={cancelDeleteTag}
+          onConfirm={confirmDeleteTag}
+          title="태그 삭제"
+          message={`"${tagToDelete.name}" 태그를 삭제하시겠습니까?`}
+          confirmText="삭제하기"
+          cancelText="취소"
+          confirmButtonColor="bg-red-600 hover:bg-red-700"
+        />
+      )}
     </div>
   );
 } 

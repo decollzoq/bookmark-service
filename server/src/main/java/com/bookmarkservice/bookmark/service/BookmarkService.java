@@ -109,7 +109,7 @@ public class BookmarkService {
         
         // 3. 공개 카테고리의 태그를 가진 모든 북마크 조회
         List<Bookmark> publicCategoryBookmarks = bookmarkRepository.findByTagIdsInOrderByCreatedAtDesc(publicTagIds);
-        
+
         // 4. 키워드로 필터링 (제목, 설명, URL에서 검색)
         return publicCategoryBookmarks.stream()
                 .filter(bookmark -> {
