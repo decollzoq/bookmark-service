@@ -146,26 +146,32 @@ export default function Home() {
         setIsSearchingPublic(true);
         setPublicSearchError(null);
         
+        console.log('🔍 통합 검색 시작:', searchTerm);
+        
         // 공개 북마크 검색 API 시도
         let results;
         let isUsingFallback = false;
         
         try {
+          console.log('📡 공개 카테고리 북마크 검색 API 호출...');
           results = await bookmarkService.searchAllBookmarks(searchTerm);
-          console.log('공개 카테고리 검색 결과:', results);
+          console.log('✅ 공개 카테고리 북마크 검색 성공:', results.length, '개 결과');
         } catch (apiError: any) {
-          console.error('공개 카테고리 검색 API 오류:', apiError);
+          console.error('❌ 공개 카테고리 검색 API 오류:', apiError);
           // API가 구현되지 않았거나 오류 발생 시 임시 처리
           if (apiError.response?.status === 500 || apiError.response?.status === 404) {
-            console.warn('공개 카테고리 검색 API가 아직 구현되지 않았습니다. 기존 API를 사용합니다.');
+            console.warn('⚠️ 공개 카테고리 검색 API가 아직 구현되지 않았습니다. 기존 API를 사용합니다.');
             setPublicSearchError('공개 카테고리 검색 API 준비 중 (임시로 내 북마크 API 사용)');
             // 기존 검색 API 사용 (임시)
             results = await bookmarkService.searchBookmarks(searchTerm);
             isUsingFallback = true;
+            console.log('🔄 대체 API 사용 결과:', results.length, '개');
           } else {
             throw apiError;
           }
         }
+        
+        console.log('📊 검색 결과 원본 데이터:', results);
         
         // 백엔드 응답을 프론트엔드 Bookmark 형식으로 변환
         const formattedResults: Bookmark[] = results.map(item => {
@@ -190,9 +196,10 @@ export default function Home() {
           };
         });
         
+        console.log('🎯 변환된 검색 결과:', formattedResults.length, '개');
         setPublicSearchResults(formattedResults);
       } catch (error) {
-        console.error('공개 북마크 검색 오류:', error);
+        console.error('💥 공개 북마크 검색 오류:', error);
         setPublicSearchResults([]);
         setPublicSearchError('공개 카테고리 검색 중 오류가 발생했습니다');
       } finally {
@@ -218,8 +225,16 @@ export default function Home() {
       return mySearchResults;
     }
     
-    // 통합 모드: 내 북마크 + 공개 북마크 (중복 제거 없이 모두 표시)
-    const combined = [...mySearchResults, ...publicSearchResults];
+    // 통합 모드: 내 북마크 + 공개 북마크 (중복 제거)
+    const combined = [...mySearchResults];
+    const myBookmarkUrls = new Set(mySearchResults.map(b => b.url)); // URL로 중복 제거
+    
+    publicSearchResults.forEach(publicBookmark => {
+      // URL이 같지 않은 경우에만 추가 (중복 제거)
+      if (!myBookmarkUrls.has(publicBookmark.url)) {
+        combined.push(publicBookmark);
+      }
+    });
     
     return combined;
   }, [mySearchResults, publicSearchResults, showIntegrated]);
@@ -253,13 +268,13 @@ export default function Home() {
   const handleShareBookmark = async (bookmark: Bookmark) => {
     try {
       const shareLink = await createShareLink({ bookmarkId: bookmark.id });
-      const fullShareUrl = `${window.location.origin}/share/${shareLink.uuid}`;
-      
-      if (!navigator.clipboard) {
-        alert(`클립보드 API를 사용할 수 없습니다. 수동으로 복사해주세요: ${fullShareUrl}`);
-        return;
-      }
-      
+    const fullShareUrl = `${window.location.origin}/share/${shareLink.uuid}`;
+    
+    if (!navigator.clipboard) {
+      alert(`클립보드 API를 사용할 수 없습니다. 수동으로 복사해주세요: ${fullShareUrl}`);
+      return;
+    }
+    
       navigator.clipboard.writeText(fullShareUrl)
         .then(() => {
           alert('북마크 링크가 클립보드에 복사되었습니다.');
