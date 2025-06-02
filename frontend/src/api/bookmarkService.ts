@@ -30,7 +30,7 @@ interface BookmarkResponse {
   // 백엔드 응답이 일관되지 않을 수 있어서 두 가지 필드 모두 정의
   tags?: Tag[];
   tagNames?: Tag[]; // 백엔드에서 이 필드명을 사용함
-  isFavorite: boolean;
+  favorite: boolean; // 백엔드와 일치하도록 favorite 사용
   createdAt: string;
   updatedAt: string;
 }

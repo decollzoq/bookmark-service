@@ -214,7 +214,7 @@ export const useBookmarkStore = create<BookmarkState>()(
               tagList: convertTagData(tagData, currentUser.id),
               createdAt: item.createdAt,
               updatedAt: item.updatedAt,
-              isFavorite: item.isFavorite,
+              isFavorite: item.favorite || false, // 백엔드 favorite 필드를 isFavorite로 매핑
               userId: currentUser.id,
               integrated: false
             };
@@ -453,7 +453,7 @@ export const useBookmarkStore = create<BookmarkState>()(
               })),
               createdAt: response.createdAt,
               updatedAt: response.updatedAt || response.createdAt,
-              isFavorite: response.isFavorite,
+              isFavorite: response.favorite,
           userId: userId,
               integrated: bookmarkData.integrated || false
         };
@@ -1020,7 +1020,48 @@ export const useBookmarkStore = create<BookmarkState>()(
           return null;
         }
         
-        // 1. 먼저 로컬 공유 링크에서 찾기 (북마크 공유용)
+        // 1. 백엔드에서 공유된 카테고리 조회 시도 (우선순위)
+        try {
+          const sharedCategoryData = await categoryService.getSharedCategory(uuid);
+          
+          if (sharedCategoryData) {
+            // 백엔드 응답을 프론트엔드 형식으로 변환
+            const tagList = (sharedCategoryData.tagNames || []).map((tagName: string) => ({
+              id: `tag-${tagName}-${Math.random()}`,
+              name: tagName,
+              userId: 'shared' // 공유된 카테고리의 태그
+            }));
+            
+            const category = {
+              id: sharedCategoryData.id,
+              title: sharedCategoryData.title,
+              tagList: tagList,
+              createdAt: new Date().toISOString(), // 임시값
+              updatedAt: new Date().toISOString(), // 임시값
+              userId: 'shared', // 공유된 카테고리
+              isPublic: true // 공유 링크로 접근 가능하므로 공개로 처리
+            };
+            
+            // 가상의 공유 링크 객체 생성
+            const shareLink = {
+              id: uuid,
+              uuid: uuid,
+              bookmarkId: null,
+              categoryId: sharedCategoryData.id,
+              createdAt: new Date().toISOString()
+            };
+            
+            return { 
+              link: shareLink, 
+              categoryData: category,
+              bookmarks: sharedCategoryData.bookmarks || [] // 백엔드에서 받은 북마크 데이터
+            };
+          }
+        } catch (error) {
+          console.error('백엔드 공유 카테고리 조회 실패:', error);
+        }
+        
+        // 2. 로컬 공유 링크에서 찾기 (북마크 공유용 또는 로컬 카테고리)
         const localLinks = get().sharedLinks;
         const localLink = localLinks.find(link => link.uuid === uuid);
         
@@ -1037,53 +1078,6 @@ export const useBookmarkStore = create<BookmarkState>()(
             return { link: localLink, categoryData: category };
           }
         }
-        
-                 // 2. 백엔드에서 공유된 카테고리 조회 시도
-         try {
-           const sharedCategoryData = await categoryService.getSharedCategory(uuid);
-           
-           if (sharedCategoryData && sharedCategoryData.category) {
-             // 백엔드 응답을 프론트엔드 형식으로 변환
-             const categoryInfo = sharedCategoryData.category;
-             const tagData = categoryInfo.tags || categoryInfo.tagNames || [];
-             
-             const category = {
-               id: categoryInfo.id,
-               title: categoryInfo.title,
-               tagList: Array.isArray(tagData) ? tagData.map((tag: any) => {
-                 if (typeof tag === 'string') {
-                   return {
-                     id: `tag-${tag}`,
-                     name: tag,
-                     userId: sharedCategoryData.owner.id
-                   };
-                 }
-                 return {
-                   id: tag.id,
-                   name: tag.name,
-                   userId: sharedCategoryData.owner.id
-                 };
-               }) : [],
-               createdAt: categoryInfo.createdAt,
-               updatedAt: categoryInfo.updatedAt,
-               userId: sharedCategoryData.owner.id,
-               isPublic: categoryInfo.isPublic
-             };
-             
-             // 가상의 공유 링크 객체 생성
-             const shareLink = {
-               id: uuid,
-               uuid: uuid,
-               bookmarkId: null,
-               categoryId: categoryInfo.id,
-               createdAt: categoryInfo.createdAt
-             };
-             
-             return { link: shareLink, categoryData: category };
-           }
-         } catch (error) {
-           // 백엔드에서 찾을 수 없는 경우 null 반환
-         }
         
         return null;
       },

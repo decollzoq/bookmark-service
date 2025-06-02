@@ -62,7 +62,7 @@ export const BookmarkList: React.FC<BookmarkListProps> = ({ categoryId }) => {
               tagList: tagList,
               createdAt: item.createdAt,
               updatedAt: item.updatedAt,
-              isFavorite: item.isFavorite || false,
+              isFavorite: item.favorite || false,
               userId: currentUser?.id || '',
               integrated: false
             };

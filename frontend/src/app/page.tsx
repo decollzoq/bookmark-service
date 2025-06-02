@@ -99,7 +99,7 @@ export default function Home() {
             tagList: tagList,
             createdAt: item.createdAt,
             updatedAt: item.updatedAt,
-            isFavorite: item.isFavorite || false,
+            isFavorite: item.favorite || false, // 백엔드 favorite 필드를 isFavorite로 매핑
             userId: currentUser?.id || '',
             integrated: false
           };
@@ -115,7 +115,7 @@ export default function Home() {
     };
     
     fetchCategoryBookmarks();
-  }, [activeCategory, currentUser]);
+  }, [activeCategory, currentUser?.id]); // userBookmarks 의존성 제거하여 무한 렌더링 방지
   
   // 내 북마크 검색 결과 계산
   const mySearchResults = useMemo(() => {
@@ -278,12 +278,31 @@ export default function Home() {
     }
   };
   
+  // 즐겨찾기 토글 함수 (categoryBookmarks 상태도 함께 업데이트)
+  const handleToggleFavorite = async (bookmarkId: string) => {
+    try {
+      // 1. 스토어의 toggleFavorite 호출
+      await toggleFavorite(bookmarkId);
+      
+      // 2. categoryBookmarks 상태도 업데이트
+      setCategoryBookmarks(prevBookmarks => 
+        prevBookmarks.map(bookmark => 
+          bookmark.id === bookmarkId 
+            ? { ...bookmark, isFavorite: !bookmark.isFavorite }
+            : bookmark
+        )
+      );
+    } catch (error) {
+      console.error('즐겨찾기 토글 오류:', error);
+    }
+  };
+  
   // 북마크 렌더링 함수
   const renderBookmarkItem = (bookmark: Bookmark) => (
     <div key={bookmark.id} className="flex items-center py-2.5 border-b border-gray-100 last:border-0">
       <div className="flex items-center flex-1">
         <button
-          onClick={() => toggleFavorite(bookmark.id)}
+          onClick={() => handleToggleFavorite(bookmark.id)}
           className="mr-3 w-6 h-6 flex items-center justify-center"
         >
           {bookmark.isFavorite ? (
@@ -447,7 +466,7 @@ export default function Home() {
                             {!bookmark.integrated && (
                               <>
                                 <button
-                                  onClick={() => toggleFavorite(bookmark.id)}
+                                  onClick={() => handleToggleFavorite(bookmark.id)}
                                   className="p-1 text-sm"
                                 >
                                   {bookmark.isFavorite ? (

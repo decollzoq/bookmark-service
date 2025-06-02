@@ -26,12 +26,10 @@ interface CategoryResponse {
 }
 
 interface ShareCategoryResponse {
-  category: CategoryResponse;
+  id: string;
+  title: string;
+  tagNames: string[];
   bookmarks: BookmarkResponse[];
-  owner: {
-    id: string;
-    name: string;
-  };
 }
 
 // 카테고리 관련 서비스
