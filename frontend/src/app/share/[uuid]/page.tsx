@@ -8,6 +8,7 @@ import { Bookmark, Category, Tag } from '@/types';
 import { toast } from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
 import categoryService from '@/api/categoryService';
+import { BookmarkResponse } from '@/api/bookmarkService';
 
 interface SharedViewProps {
   params: {
@@ -39,20 +40,6 @@ export default function SharedView({ params }: SharedViewProps) {
   const [sharedBookmark, setSharedBookmark] = useState<Bookmark | null>(null);
   const [sharedCategory, setSharedCategory] = useState<Category | null>(null);
   const [categoryBookmarks, setCategoryBookmarks] = useState<Bookmark[]>([]);
-  // 로컬 스토리지에서 sharedLinks 가져오기
-  const getSharedLinksFromLocalStorage = () => {
-    try {
-      const storedData = localStorage.getItem('bookmark-storage');
-      if (storedData) {
-        const parsedData = JSON.parse(storedData);
-        if (parsedData?.state?.sharedLinks) {
-          return parsedData.state.sharedLinks;
-        }
-      }
-    } catch (err) {
-    }
-    return [];
-  };
   
   useEffect(() => {
   }, [currentUser]);
@@ -65,115 +52,17 @@ export default function SharedView({ params }: SharedViewProps) {
         setLoading(false);
         return;
       }
+      
       try {
-        // 스토어에서 공유 링크 조회
+        // 스토어에서 공유 링크 조회 (백엔드 우선)
         const shareData = await getShareLinkByUuid(uuid);
-        // 스토어에서 찾지 못한 경우 로컬 스토리지에서 직접 조회
+        
         if (!shareData || !shareData.link) {
-          const sharedLinks = getSharedLinksFromLocalStorage();
-          const directLink = sharedLinks.find((link: any) => link.uuid === uuid);
-          
-          if (!directLink) {
-            setError('유효하지 않은 공유 링크입니다. 새로운 링크를 요청하세요.');
-            setLoading(false);
-            return;
-          }
-          // 북마크 공유 처리
-          if (directLink.bookmarkId) {
-            const bookmark = bookmarks.find(b => b.id === directLink.bookmarkId);
-            
-            if (!bookmark) {
-              setError('해당 북마크를 찾을 수 없습니다. 북마크가 삭제되었을 수 있습니다.');
-              setLoading(false);
-              return;
-            }
-            
-            setSharedBookmark(bookmark);
+          setError('유효하지 않은 공유 링크입니다. 링크가 만료되었거나 삭제되었을 수 있습니다.');
             setLoading(false);
             return;
           }
           
-          // 카테고리 공유 처리
-          if (directLink.categoryId) {
-            const category = categories.find(c => c.id === directLink.categoryId);
-            
-            if (!category) {
-              setError('해당 카테고리를 찾을 수 없습니다. 카테고리가 삭제되었을 수 있습니다.');
-              setLoading(false);
-              return;
-            }
-            
-            setSharedCategory(category);
-            
-            try {
-              // 백엔드 API를 직접 호출하여 카테고리에 할당된 북마크 가져오기
-              const categoryBookmarksData = await categoryService.getBookmarksByCategory(category.id);
-              
-              // 디버깅: 전체 응답 데이터 확인
-              console.log('카테고리 북마크 전체 응답:', categoryBookmarksData);
-              
-              // API 응답을 프론트엔드 Bookmark 형식으로 변환
-              const formattedBookmarks: Bookmark[] = categoryBookmarksData.map(item => {
-                // 디버깅: 백엔드에서 받은 태그 데이터 확인
-                console.log('백엔드에서 받은 북마크 데이터:', item);
-                console.log('북마크의 tagNames 데이터:', item.tagNames);
-                
-                // 태그 변환: 백엔드에서 tagNames 필드로 태그 정보가 전달됨
-                const tagData = item.tagNames || [];
-                const tagList: Tag[] = tagData.map((tag: any) => {
-                  // TagResponseDto 객체인 경우 (id와 name이 있는 경우)
-                  if (typeof tag === 'object' && tag.name) {
-                    return {
-                      id: tag.id || `tag-${tag.name}-${Math.random()}`,
-                      name: tag.name,
-                      userId: currentUser?.id || ''
-                    };
-                  }
-                  // 문자열인 경우 (태그 이름만 있는 경우)
-                  if (typeof tag === 'string') {
-                    return {
-                      id: `tag-${tag}-${Math.random()}`,
-                      name: tag,
-                      userId: currentUser?.id || ''
-                    };
-                  }
-                  // 기본값
-                  return {
-                    id: `tag-unknown-${Math.random()}`,
-                    name: '무제 태그',
-                    userId: currentUser?.id || ''
-                  };
-                });
-                
-                return {
-                  id: item.id,
-                  title: item.title,
-                  url: item.url,
-                  description: item.description || '',
-                  categoryId: item.categoryId || null,
-                  tagList: tagList,
-                  createdAt: item.createdAt,
-                  updatedAt: item.updatedAt,
-                  isFavorite: item.isFavorite || false,
-                  userId: currentUser?.id || '',
-                  integrated: false
-                };
-              });
-              
-              setCategoryBookmarks(formattedBookmarks);
-            } catch (error) {
-              console.error('카테고리 북마크를 가져오는 중 오류 발생:', error);
-              setCategoryBookmarks([]);
-            }
-            
-            setLoading(false);
-            return;
-          }
-          
-          setError('공유 링크에 연결된 데이터를 찾을 수 없습니다.');
-          setLoading(false);
-          return;
-        } else {
           // 북마크 공유 처리
           if (shareData.link.bookmarkId && shareData.bookmarkData) {
             setSharedBookmark(shareData.bookmarkData);
@@ -185,79 +74,52 @@ export default function SharedView({ params }: SharedViewProps) {
           if (shareData.link.categoryId && shareData.categoryData) {
             setSharedCategory(shareData.categoryData);
             
-            try {
-              // 백엔드 API를 직접 호출하여 카테고리에 할당된 북마크 가져오기
-              const categoryBookmarksData = await categoryService.getBookmarksByCategory(shareData.categoryData.id);
+          // 백엔드에서 받은 북마크 데이터가 있으면 직접 사용
+          if (shareData.bookmarks && shareData.bookmarks.length > 0) {
+            const formattedBookmarks: Bookmark[] = shareData.bookmarks.map((item: BookmarkResponse) => {
+              // 태그 변환: 백엔드에서 tagNames 필드로 태그 정보가 전달됨
+              const tagList: Tag[] = (item.tagNames || []).map((tag: any) => ({
+                id: tag.id || `tag-${tag.name || 'unknown'}-${Math.random()}`,
+                name: tag.name || '무제 태그',
+                userId: 'shared'
+              }));
               
-              // API 응답을 프론트엔드 Bookmark 형식으로 변환
-              const formattedBookmarks: Bookmark[] = categoryBookmarksData.map(item => {
-                // 디버깅: 백엔드에서 받은 태그 데이터 확인
-                console.log('백엔드에서 받은 북마크 데이터 (두번째):', item);
-                console.log('북마크의 tagNames 데이터 (두번째):', item.tagNames);
-                
-                // 태그 변환: 백엔드에서 tagNames 필드로 태그 정보가 전달됨
-                const tagData = item.tagNames || [];
-                const tagList: Tag[] = tagData.map((tag: any) => {
-                  // TagResponseDto 객체인 경우 (id와 name이 있는 경우)
-                  if (typeof tag === 'object' && tag.name) {
-                    return {
-                      id: tag.id || `tag-${tag.name}-${Math.random()}`,
-                      name: tag.name,
-                      userId: currentUser?.id || ''
-                    };
-                  }
-                  // 문자열인 경우 (태그 이름만 있는 경우)
-                  if (typeof tag === 'string') {
-                    return {
-                      id: `tag-${tag}-${Math.random()}`,
-                      name: tag,
-                      userId: currentUser?.id || ''
-                    };
-                  }
-                  // 기본값
-                  return {
-                    id: `tag-unknown-${Math.random()}`,
-                    name: '무제 태그',
-                    userId: currentUser?.id || ''
-                  };
-                });
-                
-                return {
-                  id: item.id,
-                  title: item.title,
-                  url: item.url,
-                  description: item.description || '',
-                  categoryId: item.categoryId || null,
-                  tagList: tagList,
-                  createdAt: item.createdAt,
-                  updatedAt: item.updatedAt,
-                  isFavorite: item.isFavorite || false,
-                  userId: currentUser?.id || '',
-                  integrated: false
-                };
-              });
-              
-              setCategoryBookmarks(formattedBookmarks);
-            } catch (error) {
-              console.error('카테고리 북마크를 가져오는 중 오류 발생:', error);
-              setCategoryBookmarks([]);
-            }
+              return {
+                id: item.id,
+                title: item.title,
+                url: item.url,
+                description: item.description || '',
+                categoryId: item.categoryId || null,
+                tagList: tagList,
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt,
+                isFavorite: item.favorite || false,
+                userId: 'shared',
+                integrated: false
+              };
+            });
             
-            setLoading(false);
-            return;
+            setCategoryBookmarks(formattedBookmarks);
+          } else {
+            // 백엔드에서 북마크 데이터가 없으면 빈 배열 설정
+            setCategoryBookmarks([]);
           }
-          setError('공유 링크에 연결된 데이터를 찾을 수 없습니다.');
+          
           setLoading(false);
           return;
         }
+        
+        setError('공유 링크에 연결된 데이터를 찾을 수 없습니다.');
+        setLoading(false);
       } catch (error) {
+        console.error('공유 링크 데이터 로드 오류:', error);
         setError('공유 링크 데이터를 로드하는 중 오류가 발생했습니다.');
         setLoading(false);
       }
     };
     
     loadSharedData();
-  }, [uuid, bookmarks, categories, getShareLinkByUuid, currentUser]);
+  }, [uuid, getShareLinkByUuid]);
   
   // 북마크 저장 함수
   const handleSaveBookmark = (bookmark: Bookmark) => {
@@ -366,7 +228,7 @@ export default function SharedView({ params }: SharedViewProps) {
       }
       
       toast.success(`카테고리 "${sharedCategory.title}"를 성공적으로 가져왔습니다`);
-      router.push('/');
+        router.push('/');
     } catch (err) {
       console.error('카테고리 가져오기 오류:', err);
       toast.error('카테고리 가져오기 중 오류가 발생했습니다');

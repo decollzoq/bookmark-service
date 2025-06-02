@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { Bookmark, Category, Tag } from '@/types';
 import categoryService from '@/api/categoryService';
 import bookmarkService from '@/api/bookmarkService';
-
+import { toast } from 'react-hot-toast';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 export default function Home() {
   const { 
@@ -34,6 +35,10 @@ export default function Home() {
   const [isSearchingPublic, setIsSearchingPublic] = useState(false);
   const [publicSearchError, setPublicSearchError] = useState<string | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+  
+  // 삭제 확인 모달 상태
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [bookmarkToDelete, setBookmarkToDelete] = useState<Bookmark | null>(null);
   
   // 컴포넌트 마운트 시 백엔드에서 북마크 데이터 로드
   useEffect(() => {
@@ -99,7 +104,7 @@ export default function Home() {
             tagList: tagList,
             createdAt: item.createdAt,
             updatedAt: item.updatedAt,
-            isFavorite: item.isFavorite || false,
+            isFavorite: item.favorite || false, // 백엔드 favorite 필드를 isFavorite로 매핑
             userId: currentUser?.id || '',
             integrated: false
           };
@@ -115,7 +120,7 @@ export default function Home() {
     };
     
     fetchCategoryBookmarks();
-  }, [activeCategory, currentUser]);
+  }, [activeCategory, currentUser?.id, userBookmarks.length]); // userBookmarks.length 의존성 추가하여 북마크 로드 완료 후 실행
   
   // 내 북마크 검색 결과 계산
   const mySearchResults = useMemo(() => {
@@ -146,24 +151,32 @@ export default function Home() {
         setIsSearchingPublic(true);
         setPublicSearchError(null);
         
+        console.log('🔍 통합 검색 시작:', searchTerm);
+        
         // 공개 북마크 검색 API 시도
         let results;
         let isUsingFallback = false;
         
         try {
+          console.log('📡 공개 카테고리 북마크 검색 API 호출...');
           results = await bookmarkService.searchAllBookmarks(searchTerm);
+          console.log('✅ 공개 카테고리 북마크 검색 성공:', results.length, '개 결과');
         } catch (apiError: any) {
+          console.error('❌ 공개 카테고리 검색 API 오류:', apiError);
           // API가 구현되지 않았거나 오류 발생 시 임시 처리
           if (apiError.response?.status === 500 || apiError.response?.status === 404) {
-                                console.warn('공개 카테고리 검색 API가 아직 구현되지 않았습니다. 기존 API를 사용합니다.');
+            console.warn('⚠️ 공개 카테고리 검색 API가 아직 구현되지 않았습니다. 기존 API를 사용합니다.');
             setPublicSearchError('공개 카테고리 검색 API 준비 중 (임시로 내 북마크 API 사용)');
             // 기존 검색 API 사용 (임시)
             results = await bookmarkService.searchBookmarks(searchTerm);
             isUsingFallback = true;
+            console.log('🔄 대체 API 사용 결과:', results.length, '개');
           } else {
             throw apiError;
           }
         }
+        
+        console.log('📊 검색 결과 원본 데이터:', results);
         
         // 백엔드 응답을 프론트엔드 Bookmark 형식으로 변환
         const formattedResults: Bookmark[] = results.map(item => {
@@ -188,9 +201,10 @@ export default function Home() {
           };
         });
         
+        console.log('🎯 변환된 검색 결과:', formattedResults.length, '개');
         setPublicSearchResults(formattedResults);
       } catch (error) {
-        console.error('공개 북마크 검색 오류:', error);
+        console.error('💥 공개 북마크 검색 오류:', error);
         setPublicSearchResults([]);
         setPublicSearchError('공개 카테고리 검색 중 오류가 발생했습니다');
       } finally {
@@ -262,19 +276,84 @@ export default function Home() {
       const fullShareUrl = `${window.location.origin}/share/${shareLink.uuid}`;
       
       if (!navigator.clipboard) {
-        alert(`클립보드 API를 사용할 수 없습니다. 수동으로 복사해주세요: ${fullShareUrl}`);
+        toast.error('클립보드 API를 사용할 수 없습니다. 브라우저가 클립보드 접근을 지원하지 않습니다.', {
+          duration: 5000,
+          position: 'bottom-center',
+          style: {
+            background: '#EF4444',
+            color: 'white',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: '500',
+            padding: '12px 16px'
+          },
+          icon: '❌'
+        });
         return;
       }
       
-      navigator.clipboard.writeText(fullShareUrl)
-        .then(() => {
-          alert('북마크 링크가 클립보드에 복사되었습니다.');
-        })
-        .catch((error) => {
-          alert(`북마크 링크: ${fullShareUrl} (수동으로 복사해주세요)`);
+      try {
+        await navigator.clipboard.writeText(fullShareUrl);
+        toast.success('링크가 복사되었습니다! 🎉', {
+          duration: 4000,
+          position: 'bottom-center',
+          style: {
+            background: '#10B981',
+            color: 'white',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: '500',
+            padding: '12px 16px'
+          },
+          icon: '📋'
         });
+      } catch (clipboardError) {
+        toast.success(`북마크 링크: ${fullShareUrl}`, {
+          duration: 6000,
+          position: 'bottom-center',
+          style: {
+            background: '#10B981',
+            color: 'white',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: '500',
+            padding: '12px 16px'
+          }
+        });
+      }
     } catch (err) {
-      alert('북마크 공유 링크 생성에 실패했습니다.');
+      toast.error('링크 복사에 실패했습니다.', {
+        duration: 4000,
+        position: 'bottom-center',
+        style: {
+          background: '#EF4444',
+          color: 'white',
+          borderRadius: '8px',
+          fontSize: '14px',
+          fontWeight: '500',
+          padding: '12px 16px'
+        },
+        icon: '❌'
+      });
+    }
+  };
+  
+  // 즐겨찾기 토글 함수 (categoryBookmarks 상태도 함께 업데이트)
+  const handleToggleFavorite = async (bookmarkId: string) => {
+    try {
+      // 1. 스토어의 toggleFavorite 호출
+      await toggleFavorite(bookmarkId);
+      
+      // 2. categoryBookmarks 상태도 업데이트
+      setCategoryBookmarks(prevBookmarks => 
+        prevBookmarks.map(bookmark => 
+          bookmark.id === bookmarkId 
+            ? { ...bookmark, isFavorite: !bookmark.isFavorite }
+            : bookmark
+        )
+      );
+    } catch (error) {
+      console.error('즐겨찾기 토글 오류:', error);
     }
   };
   
@@ -283,7 +362,7 @@ export default function Home() {
     <div key={bookmark.id} className="flex items-center py-2.5 border-b border-gray-100 last:border-0">
       <div className="flex items-center flex-1">
         <button
-          onClick={() => toggleFavorite(bookmark.id)}
+          onClick={() => handleToggleFavorite(bookmark.id)}
           className="mr-3 w-6 h-6 flex items-center justify-center"
         >
           {bookmark.isFavorite ? (
@@ -323,9 +402,8 @@ export default function Home() {
         <button
           key={`delete-${bookmark.id}`}
           onClick={() => {
-            if (window.confirm(`"${bookmark.title}" 북마크를 삭제하시겠습니까?`)) {
-              deleteBookmark(bookmark.id);
-            }
+            setShowDeleteModal(true);
+            setBookmarkToDelete(bookmark);
           }}
           className="p-1.5 text-gray-600 hover:text-red-600"
           title="삭제"
@@ -447,7 +525,7 @@ export default function Home() {
                             {!bookmark.integrated && (
                               <>
                                 <button
-                                  onClick={() => toggleFavorite(bookmark.id)}
+                                  onClick={() => handleToggleFavorite(bookmark.id)}
                                   className="p-1 text-sm"
                                 >
                                   {bookmark.isFavorite ? (
@@ -471,7 +549,19 @@ export default function Home() {
                                 onClick={() => {
                                   // 공개 카테고리 북마크를 내 북마크로 복사하는 기능 (추후 구현 가능)
                                   navigator.clipboard.writeText(bookmark.url);
-                                  alert('URL이 클립보드에 복사되었습니다.');
+                                  toast.success('URL이 클립보드에 복사되었습니다! 🎉', {
+                                    duration: 3000,
+                                    position: 'bottom-center',
+                                    style: {
+                                      background: '#10B981',
+                                      color: 'white',
+                                      borderRadius: '8px',
+                                      fontSize: '14px',
+                                      fontWeight: '500',
+                                      padding: '12px 16px'
+                                    },
+                                    icon: '📋'
+                                  });
                                 }}
                                 className="p-1 text-gray-600 hover:text-gray-900 text-sm"
                                 title="URL 복사"
@@ -646,6 +736,39 @@ export default function Home() {
         </div>
       </div>
         </>
+      )}
+      
+      {/* 삭제 확인 모달 */}
+      {showDeleteModal && bookmarkToDelete && (
+        <ConfirmModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={() => {
+            deleteBookmark(bookmarkToDelete.id);
+            
+            // 삭제 성공 토스트 메시지
+            toast.success(`"${bookmarkToDelete.title}" 북마크가 삭제되었습니다.`, {
+              duration: 3000,
+              position: 'bottom-center',
+              style: {
+                background: '#10B981',
+                color: 'white',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                padding: '12px 16px'
+              },
+              icon: '🗑️'
+            });
+            
+            setShowDeleteModal(false);
+          }}
+          title="북마크 삭제"
+          message={`"${bookmarkToDelete.title}" 북마크를 삭제하시겠습니까?`}
+          confirmText="삭제하기"
+          cancelText="취소"
+          confirmButtonColor="bg-red-600 hover:bg-red-700"
+        />
       )}
     </div>
   );
