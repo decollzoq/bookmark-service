@@ -16,13 +16,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body className="min-h-screen bg-gray-50">
+      <body className="min-h-screen bg-gray-50 flex flex-col">
         <AuthProvider>
           <Navbar />
-          <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+          <main className="flex-1 max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 w-full">
             {children}
           </main>
-          <footer className="bg-white py-6 border-t">
+          <footer className="bg-white py-6 border-t mt-auto">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <p className="text-center text-sm text-gray-500">
                 © {new Date().getFullYear()} 북마크 저장 및 공유 서비스

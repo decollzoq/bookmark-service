@@ -94,8 +94,8 @@ public class BookmarkService {
 
     // 공개 카테고리 북마크 검색
     public List<BookmarkResponseDto> searchPublicCategoryBookmarks(String keyword) {
-        // 1. 공개 카테고리들 조회
-        List<Category> publicCategories = categoryRepository.findByIsPublicTrueAndTitleContainingIgnoreCase(keyword);
+        // 1. 모든 공개 카테고리들 조회 (키워드 제한 없이)
+        List<Category> publicCategories = categoryRepository.findByIsPublicTrue();
         
         // 2. 공개 카테고리들의 태그 ID 수집
         List<String> publicTagIds = publicCategories.stream()
@@ -107,24 +107,16 @@ public class BookmarkService {
             return List.of(); // 공개 카테고리가 없으면 빈 리스트 반환
         }
         
-        // 3. 해당 태그들을 가진 북마크들 조회
-        List<Bookmark> titleMatches = bookmarkRepository.findByTitleContainingIgnoreCase(keyword);
-        List<Bookmark> descriptionMatches = bookmarkRepository.findByDescriptionContainingIgnoreCase(keyword);
-        
-        // 4. 중복 제거하여 합치기
-        List<Bookmark> allMatches = Stream.concat(titleMatches.stream(), descriptionMatches.stream())
-                .distinct()
-                .collect(Collectors.toList());
+        // 3. 공개 카테고리의 태그를 가진 모든 북마크 조회
+        List<Bookmark> publicCategoryBookmarks = bookmarkRepository.findByTagIdsInOrderByCreatedAtDesc(publicTagIds);
 
-        // 5. 공개 카테고리의 태그를 포함한 북마크만 필터링
-        return allMatches.stream()
+        // 4. 키워드로 필터링 (제목, 설명, URL에서 검색)
+        return publicCategoryBookmarks.stream()
                 .filter(bookmark -> {
-                    if (bookmark.getTagIds() == null || bookmark.getTagIds().isEmpty()) {
-                        return false;
-                    }
-                    // 북마크의 태그 중 하나라도 공개 카테고리의 태그와 일치하면 포함
-                    return bookmark.getTagIds().stream()
-                            .anyMatch(publicTagIds::contains);
+                    String lowerKeyword = keyword.toLowerCase();
+                    return bookmark.getTitle().toLowerCase().contains(lowerKeyword) ||
+                           (bookmark.getDescription() != null && bookmark.getDescription().toLowerCase().contains(lowerKeyword)) ||
+                           bookmark.getUrl().toLowerCase().contains(lowerKeyword);
                 })
                 .map(b -> new BookmarkResponseDto(
                         b,

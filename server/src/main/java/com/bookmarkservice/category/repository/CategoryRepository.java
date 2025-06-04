@@ -10,5 +10,5 @@ public interface CategoryRepository extends MongoRepository<Category, String> {
     List<Category> findByUserIdAndTagIdsContaining(String userId, String tagId);
     List<Category> findByIsPublicTrueAndTitleContainingIgnoreCase(String keyword);
     List<Category> findByIsPublicTrueAndTagIdsIn(List<String> tagIds);
-
+    List<Category> findByIsPublicTrue();
 }
