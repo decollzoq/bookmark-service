@@ -39,6 +39,15 @@ export default function SharedView({ params }: SharedViewProps) {
   const [sharedBookmark, setSharedBookmark] = useState<Bookmark | null>(null);
   const [sharedCategory, setSharedCategory] = useState<Category | null>(null);
   const [categoryBookmarks, setCategoryBookmarks] = useState<Bookmark[]>([]);
+  const [currentPath, setCurrentPath] = useState('');
+  
+  // 클라이언트 사이드에서 현재 경로 가져오기
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setCurrentPath(window.location.pathname);
+    }
+  }, []);
+  
   // 로컬 스토리지에서 sharedLinks 가져오기
   const getSharedLinksFromLocalStorage = () => {
     try {
@@ -450,7 +459,7 @@ export default function SharedView({ params }: SharedViewProps) {
               <div className="text-center">
                 <p className="text-gray-600 mb-2">북마크를 내 컬렉션에 추가하려면 로그인이 필요합니다.</p>
                 <Link
-                  href="/login"
+                  href={`/login?redirect=${encodeURIComponent(currentPath)}`}
                   className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 inline-block"
                 >
                   로그인
@@ -553,7 +562,7 @@ export default function SharedView({ params }: SharedViewProps) {
               <div className="text-center">
                 <p className="text-gray-600 mb-2">카테고리를 내 컬렉션에 추가하려면 로그인이 필요합니다.</p>
                 <Link
-                  href="/login"
+                  href={`/login?redirect=${encodeURIComponent(currentPath)}`}
                   className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 inline-block"
                 >
                   로그인

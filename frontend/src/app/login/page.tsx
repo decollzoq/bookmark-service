@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useBookmarkStore } from '@/store/useBookmarkStore';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, verifyEmail, resendVerification } = useBookmarkStore();
   
   const [formData, setFormData] = useState({
@@ -19,6 +20,9 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [needVerification, setNeedVerification] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  
+  // redirect 파라미터 가져오기
+  const redirectTo = searchParams.get('redirect') || '/';
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -41,12 +45,11 @@ export default function LoginPage() {
     }
     
     try {
-      // 디버깅: API 요청 직접 시도
       // 로그인 처리
       await login(formData.email, formData.password);
       
-      // 로그인 성공 시 메인 페이지로 리다이렉트
-      router.push('/');
+      // 로그인 성공 시 redirect 파라미터가 있으면 해당 URL로, 없으면 메인 페이지로 리다이렉트
+      router.push(redirectTo);
     } catch (err) {
       // 디버깅: 오류 객체 자세히 검사
       if (err instanceof Error) {
@@ -85,8 +88,8 @@ export default function LoginPage() {
       // 이메일 인증 처리
       await verifyEmail(formData.email, formData.verificationCode);
       
-      // 인증 성공, 메인 페이지로 리다이렉트
-      router.push('/');
+      // 인증 성공 시 redirect 파라미터가 있으면 해당 URL로, 없으면 메인 페이지로 리다이렉트
+      router.push(redirectTo);
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);

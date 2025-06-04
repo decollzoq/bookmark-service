@@ -2,7 +2,7 @@
 
 import { BookmarkForm } from '@/components/BookmarkForm';
 import { useBookmarkStore } from '@/store/useBookmarkStore';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import React from 'react';
 import { Bookmark } from '@/types';
@@ -14,8 +14,12 @@ export default function EditBookmarkPage({ params }: { params: { id: string } })
   
   const { bookmarks } = useBookmarkStore();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [bookmark, setBookmark] = useState<Bookmark | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // redirect 파라미터 가져오기
+  const redirectTo = searchParams.get('redirect') || '/bookmark';
   
   useEffect(() => {
     if (id) {
@@ -28,7 +32,7 @@ export default function EditBookmarkPage({ params }: { params: { id: string } })
   }, [bookmarks, id]);
   
   const handleSuccess = () => {
-    router.push('/bookmark');
+    router.push(redirectTo);
   };
   
   if (loading) {
