@@ -89,7 +89,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
         await navigator.clipboard.writeText(fullShareUrl);
         toast.success('공유 링크가 클립보드에 복사되었습니다! 🎉', {
           duration: 4000,
-          position: 'bottom-center',
+              position: 'bottom-center',
           style: {
             background: '#10B981',
             color: 'white',
@@ -99,7 +99,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
             padding: '12px 16px'
           },
           icon: '📋'
-        });
+          });
       } else {
         // 클립보드 API를 지원하지 않는 브라우저 처리
         toast.success(`공유 링크: ${fullShareUrl}`, {
