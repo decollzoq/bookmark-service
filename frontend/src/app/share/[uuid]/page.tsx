@@ -40,6 +40,15 @@ export default function SharedView({ params }: SharedViewProps) {
   const [sharedBookmark, setSharedBookmark] = useState<Bookmark | null>(null);
   const [sharedCategory, setSharedCategory] = useState<Category | null>(null);
   const [categoryBookmarks, setCategoryBookmarks] = useState<Bookmark[]>([]);
+  const [currentPath, setCurrentPath] = useState('');
+  
+  // 클라이언트 사이드에서 현재 경로 가져오기
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setCurrentPath(window.location.pathname);
+    }
+  }, []);
+  
   // 로컬 스토리지에서 sharedLinks 가져오기
   const getSharedLinksFromLocalStorage = () => {
     try {

@@ -26,6 +26,11 @@ export default function BookmarksPage() {
   const [isClient, setIsClient] = useState(false);
   const [userBookmarksList, setUserBookmarksList] = useState<Bookmark[]>([]);
   const [userTagsList, setUserTagsList] = useState<Tag[]>([]);
+  const [sortOption, setSortOption] = useState<string>('createdAt');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [bookmarkToDelete, setBookmarkToDelete] = useState<Bookmark | null>(null);
+  const [showDeleteTagModal, setShowDeleteTagModal] = useState(false);
+  const [tagToDelete, setTagToDelete] = useState<{ id: string; name: string } | null>(null);
   
   // 클라이언트 사이드에서만 실행되는 코드
   useEffect(() => {
@@ -192,6 +197,20 @@ export default function BookmarksPage() {
           </div>
         )}
         
+        {/* 정렬 컨트롤 */}
+        {isClient && currentUser && userBookmarksList.length > 0 && (
+          <div className="flex justify-end mb-4">
+            <select
+              className="px-4 py-2 border rounded-lg"
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value)}
+            >
+              <option value="createdAt">최근 추가순</option>
+              <option value="title">제목순</option>
+            </select>
+          </div>
+        )}
+        
         {!isClient || userBookmarksList.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             {!isClient
@@ -203,7 +222,14 @@ export default function BookmarksPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {userBookmarksList.map((bookmark) => (
+            {/* 정렬된 북마크 목록 */}
+            {[...userBookmarksList].sort((a, b) => {
+              if (sortOption === 'title') {
+                return a.title.localeCompare(b.title);
+              } else { // createdAt가 기본값
+                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+              }
+            }).map((bookmark) => (
               <div 
                 key={bookmark.id || `temp-${Math.random()}`} 
                 className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition group relative"
@@ -293,15 +319,7 @@ export default function BookmarksPage() {
                     )}
                     
                     <button
-                      onClick={() => {
-                        if (window.confirm('이 북마크를 삭제하시겠습니까?')) {
-                          deleteBookmark(bookmark.id);
-                          // 상태 업데이트
-                          setUserBookmarksList(prevBookmarks => 
-                            prevBookmarks.filter(b => b.id !== bookmark.id)
-                          );
-                        }
-                      }}
+                      onClick={() => handleDeleteBookmark(bookmark)}
                       className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-red-600"
                       title="삭제"
                     >
